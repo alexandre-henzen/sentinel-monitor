@@ -1,0 +1,471 @@
+# Azure DevOps Pipeline for EAM v5.0
+# Multi-stage pipeline with parallel jobs, security scans, and deployment
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    exclude:
+      - README.md
+      - docs/*
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - README.md
+      - docs/*
+
+variables:
+  - group: EAM-Variables
+  - name: buildConfiguration
+    value: 'Release'
+  - name: dotnetSdkVersion
+    value: '8.0.x'
+  - name: nodeVersion
+    value: '18.x'
+  - name: dockerRegistryServiceConnection
+    value: 'EAM-ACR'
+  - name: imageRepository
+    value: 'eam'
+  - name: containerRegistry
+    value: 'eamregistry.azurecr.io'
+  - name: dockerfilePath
+    value: '$(Build.SourcesDirectory)/deploy/docker'
+  - name: tag
+    value: '$(Build.BuildId)'
+  - name: vmImageName
+    value: 'ubuntu-latest'
+
+stages:
+  # Stage 1: Build and Test
+  - stage: BuildAndTest
+    displayName: 'Build and Test'
+    jobs:
+      # Job 1: Build .NET
+      - job: BuildDotNet
+        displayName: 'Build .NET Components'
+        pool:
+          vmImage: 'windows-latest'
+        
+        steps:
+          - checkout: self
+            fetchDepth: 0
+          
+          - task: UseDotNet@2
+            displayName: 'Use .NET SDK'
+            inputs:
+              packageType: 'sdk'
+              version: $(dotnetSdkVersion)
+              includePreviewVersions: false
+          
+          - task: Cache@2
+            displayName: 'Cache NuGet packages'
+            inputs:
+              key: 'nuget | "$(Agent.OS)" | **/*.csproj'
+              restoreKeys: |
+                nuget | "$(Agent.OS)"
+                nuget
+              path: '$(NUGET_PACKAGES)'
+          
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore packages'
+            inputs:
+              command: 'restore'
+              projects: 'EAM.sln'
+              feedsToUse: 'select'
+              vstsFeed: 'EAM-Feed'
+          
+          - task: DotNetCoreCLI@2
+            displayName: 'Build solution'
+            inputs:
+              command: 'build'
+              projects: 'EAM.sln'
+              arguments: '--configuration $(buildConfiguration) --no-restore'
+          
+          - task: DotNetCoreCLI@2
+            displayName: 'Run unit tests'
+            inputs:
+              command: 'test'
+              projects: '**/*Tests.csproj'
+              arguments: '--configuration $(buildConfiguration) --no-build --collect:"XPlat Code Coverage" --logger trx --results-directory $(Agent.TempDirectory)'
+          
+          - task: PublishTestResults@2
+            displayName: 'Publish test results'
+            inputs:
+              testResultsFormat: 'VSTest'
+              testResultsFiles: '**/*.trx'
+              searchFolder: '$(Agent.TempDirectory)'
+              mergeTestResults: true
+              failTaskOnFailedTests: true
+          
+          - task: PublishCodeCoverageResults@1
+            displayName: 'Publish code coverage'
+            inputs:
+              codeCoverageTool: 'Cobertura'
+              summaryFileLocation: '$(Agent.TempDirectory)/**/*coverage.cobertura.xml'
+          
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish Agent'
+            inputs:
+              command: 'publish'
+              projects: 'src/EAM.Agent/EAM.Agent.csproj'
+              arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/Agent --runtime win-x64 --self-contained true'
+          
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish API'
+            inputs:
+              command: 'publish'
+              projects: 'src/EAM.API/EAM.API.csproj'
+              arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/API --runtime linux-x64 --self-contained false'
+          
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish .NET artifacts'
+            inputs:
+              pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              artifactName: 'dotnet-artifacts'
+
+      # Job 2: Build Angular
+      - job: BuildAngular
+        displayName: 'Build Angular Application'
+        pool:
+          vmImage: $(vmImageName)
+        
+        steps:
+          - checkout: self
+          
+          - task: NodeTool@0
+            displayName: 'Use Node.js'
+            inputs:
+              versionSpec: $(nodeVersion)
+          
+          - task: Cache@2
+            displayName: 'Cache NPM packages'
+            inputs:
+              key: 'npm | "$(Agent.OS)" | src/package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+                npm
+              path: '$(NPM_CONFIG_CACHE)'
+          
+          - task: Npm@1
+            displayName: 'npm ci'
+            inputs:
+              command: 'ci'
+              workingDir: 'src'
+          
+          - task: Npm@1
+            displayName: 'npm run lint'
+            inputs:
+              command: 'custom'
+              customCommand: 'run lint'
+              workingDir: 'src'
+          
+          - task: Npm@1
+            displayName: 'npm run test'
+            inputs:
+              command: 'custom'
+              customCommand: 'run test:ci'
+              workingDir: 'src'
+          
+          - task: PublishTestResults@2
+            displayName: 'Publish Angular test results'
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: 'src/test-results.xml'
+              mergeTestResults: true
+              failTaskOnFailedTests: true
+          
+          - task: PublishCodeCoverageResults@1
+            displayName: 'Publish Angular code coverage'
+            inputs:
+              codeCoverageTool: 'Cobertura'
+              summaryFileLocation: 'src/coverage/cobertura-coverage.xml'
+              reportDirectory: 'src/coverage'
+          
+          - task: Npm@1
+            displayName: 'npm run build'
+            inputs:
+              command: 'custom'
+              customCommand: 'run build:prod'
+              workingDir: 'src'
+          
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Angular artifacts'
+            inputs:
+              pathtoPublish: 'src/dist'
+              artifactName: 'angular-artifacts'
+
+  # Stage 2: Security Scan
+  - stage: SecurityScan
+    displayName: 'Security Scan'
+    dependsOn: BuildAndTest
+    jobs:
+      - job: SecurityAnalysis
+        displayName: 'Security Analysis'
+        pool:
+          vmImage: $(vmImageName)
+        
+        steps:
+          - checkout: self
+          
+          - task: CredScan@3
+            displayName: 'Credential Scanner'
+            inputs:
+              toolMajorVersion: 'V2'
+              scanFolder: '$(Build.SourcesDirectory)'
+              debugMode: false
+          
+          - task: SonarCloudPrepare@1
+            displayName: 'Prepare SonarCloud analysis'
+            inputs:
+              SonarCloud: 'EAM-SonarCloud'
+              organization: 'eam-organization'
+              scannerMode: 'MSBuild'
+              projectKey: 'EAM-v5'
+              projectName: 'Employee Activity Monitor v5.0'
+          
+          - task: UseDotNet@2
+            displayName: 'Use .NET SDK'
+            inputs:
+              packageType: 'sdk'
+              version: $(dotnetSdkVersion)
+          
+          - task: DotNetCoreCLI@2
+            displayName: 'Build for SonarCloud'
+            inputs:
+              command: 'build'
+              projects: 'EAM.sln'
+              arguments: '--configuration $(buildConfiguration)'
+          
+          - task: SonarCloudAnalyze@1
+            displayName: 'Run SonarCloud analysis'
+          
+          - task: SonarCloudPublish@1
+            displayName: 'Publish SonarCloud results'
+            inputs:
+              pollingTimeoutSec: '300'
+          
+          - task: WhiteSource@21
+            displayName: 'WhiteSource Scan'
+            inputs:
+              cwd: '$(Build.SourcesDirectory)'
+              projectName: 'EAM-v5'
+          
+          - task: PublishSecurityAnalysisLogs@3
+            displayName: 'Publish security analysis logs'
+            inputs:
+              ArtifactName: 'CodeAnalysisLogs'
+              ArtifactType: 'Container'
+
+  # Stage 3: Build Docker Images
+  - stage: BuildImages
+    displayName: 'Build Docker Images'
+    dependsOn: SecurityScan
+    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq(variables['Build.SourceBranch'], 'refs/heads/develop')))
+    jobs:
+      - job: BuildDockerImages
+        displayName: 'Build Docker Images'
+        pool:
+          vmImage: $(vmImageName)
+        strategy:
+          matrix:
+            Agent:
+              componentName: 'agent'
+              dockerfile: '$(dockerfilePath)/agent.Dockerfile'
+            API:
+              componentName: 'api'
+              dockerfile: '$(dockerfilePath)/api.Dockerfile'
+            Frontend:
+              componentName: 'frontend'
+              dockerfile: '$(dockerfilePath)/frontend.Dockerfile'
+        
+        steps:
+          - checkout: self
+          
+          - task: Docker@2
+            displayName: 'Build and push Docker image'
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: '$(imageRepository)-$(componentName)'
+              command: 'buildAndPush'
+              Dockerfile: $(dockerfile)
+              buildContext: '$(Build.SourcesDirectory)'
+              tags: |
+                $(tag)
+                latest
+          
+          - task: AzureCLI@2
+            displayName: 'Scan Docker image'
+            inputs:
+              azureSubscription: 'EAM-Azure-Subscription'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az acr check-health --name $(containerRegistry)
+                az acr repository show-tags --name $(containerRegistry) --repository $(imageRepository)-$(componentName)
+
+  # Stage 4: Deploy to Staging
+  - stage: DeployStaging
+    displayName: 'Deploy to Staging'
+    dependsOn: BuildImages
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployToStaging
+        displayName: 'Deploy to Staging Environment'
+        pool:
+          vmImage: $(vmImageName)
+        environment: 'EAM-Staging'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                
+                - task: KubernetesManifest@0
+                  displayName: 'Create namespace'
+                  inputs:
+                    action: 'deploy'
+                    kubernetesServiceConnection: 'EAM-K8s-Staging'
+                    namespace: 'eam-staging'
+                    manifests: 'deploy/kubernetes/namespace.yml'
+                
+                - task: KubernetesManifest@0
+                  displayName: 'Deploy to Kubernetes'
+                  inputs:
+                    action: 'deploy'
+                    kubernetesServiceConnection: 'EAM-K8s-Staging'
+                    namespace: 'eam-staging'
+                    manifests: |
+                      deploy/kubernetes/deployments/*.yml
+                      deploy/kubernetes/services/*.yml
+                      deploy/kubernetes/configmaps/*.yml
+                    containers: |
+                      $(containerRegistry)/$(imageRepository)-agent:$(tag)
+                      $(containerRegistry)/$(imageRepository)-api:$(tag)
+                      $(containerRegistry)/$(imageRepository)-frontend:$(tag)
+                
+                - task: Bash@3
+                  displayName: 'Health check'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      echo "Running health checks..."
+                      ./deploy/scripts/health-check.sh staging
+                
+                - task: Bash@3
+                  displayName: 'Integration tests'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      echo "Running integration tests..."
+                      # Add integration test commands here
+
+  # Stage 5: Deploy to Production
+  - stage: DeployProduction
+    displayName: 'Deploy to Production'
+    dependsOn: DeployStaging
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployToProduction
+        displayName: 'Deploy to Production Environment'
+        pool:
+          vmImage: $(vmImageName)
+        environment: 'EAM-Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                
+                - task: Bash@3
+                  displayName: 'Backup database'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      echo "Creating database backup..."
+                      ./deploy/scripts/backup.sh production
+                
+                - task: KubernetesManifest@0
+                  displayName: 'Deploy to Production Kubernetes'
+                  inputs:
+                    action: 'deploy'
+                    kubernetesServiceConnection: 'EAM-K8s-Production'
+                    namespace: 'eam-production'
+                    manifests: |
+                      deploy/kubernetes/deployments/*.yml
+                      deploy/kubernetes/services/*.yml
+                      deploy/kubernetes/configmaps/*.yml
+                    containers: |
+                      $(containerRegistry)/$(imageRepository)-agent:$(tag)
+                      $(containerRegistry)/$(imageRepository)-api:$(tag)
+                      $(containerRegistry)/$(imageRepository)-frontend:$(tag)
+                    rolloutStatusTimeout: '600'
+                
+                - task: Bash@3
+                  displayName: 'Production health check'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      echo "Running production health checks..."
+                      ./deploy/scripts/health-check.sh production
+                
+                - task: Bash@3
+                  displayName: 'Smoke tests'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      echo "Running smoke tests..."
+                      # Add smoke test commands here
+            
+            onFailure:
+              steps:
+                - task: Bash@3
+                  displayName: 'Rollback on failure'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      echo "Rolling back deployment..."
+                      ./deploy/scripts/rollback.sh production
+
+  # Stage 6: Post-deployment
+  - stage: PostDeployment
+    displayName: 'Post-deployment'
+    dependsOn: DeployProduction
+    condition: succeeded()
+    jobs:
+      - job: PostDeploymentTasks
+        displayName: 'Post-deployment Tasks'
+        pool:
+          vmImage: $(vmImageName)
+        
+        steps:
+          - checkout: self
+          
+          - task: Bash@3
+            displayName: 'Update monitoring'
+            inputs:
+              targetType: 'inline'
+              script: |
+                echo "Updating monitoring dashboards..."
+                # Add monitoring update commands here
+          
+          - task: Bash@3
+            displayName: 'Send notifications'
+            inputs:
+              targetType: 'inline'
+              script: |
+                echo "Sending deployment notifications..."
+                # Add notification commands here
+          
+          - task: Bash@3
+            displayName: 'Cleanup'
+            inputs:
+              targetType: 'inline'
+              script: |
+                echo "Cleaning up old resources..."
+                # Add cleanup commands here

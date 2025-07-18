@@ -1,0 +1,338 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eam-config
+  namespace: eam-system
+  labels:
+    app: eam
+    component: config
+    version: "5.0.0"
+    app.kubernetes.io/name: eam
+    app.kubernetes.io/version: "5.0.0"
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: employee-activity-monitor
+    app.kubernetes.io/managed-by: kubernetes
+data:
+  # API Configuration
+  api-url: "https://api.eam.company.com"
+  api-internal-url: "http://eam-api-service:80"
+  
+  # Authentication Configuration
+  auth-issuer: "https://auth.eam.company.com"
+  auth-client-id: "eam-frontend"
+  auth-scope: "openid profile email eam-api"
+  
+  # MinIO Configuration
+  minio-endpoint: "minio-service:9000"
+  minio-bucket-name: "eam-screenshots"
+  minio-region: "us-east-1"
+  minio-use-ssl: "false"
+  
+  # Telemetry Configuration
+  otlp-endpoint: "http://jaeger-collector:4317"
+  telemetry-service-name: "eam"
+  telemetry-service-version: "5.0.0"
+  telemetry-export-interval: "30"
+  
+  # Database Configuration
+  database-host: "postgresql-service"
+  database-port: "5432"
+  database-name: "eam"
+  database-user: "eam_user"
+  database-ssl-mode: "require"
+  
+  # Redis Configuration
+  redis-host: "redis-service"
+  redis-port: "6379"
+  redis-database: "0"
+  
+  # Application Configuration
+  environment: "production"
+  log-level: "Information"
+  max-request-size: "10MB"
+  request-timeout: "30s"
+  
+  # Security Configuration
+  cors-origins: "https://eam.company.com,https://api.eam.company.com"
+  allowed-hosts: "eam.company.com,api.eam.company.com"
+  
+  # Feature Flags
+  enable-telemetry: "true"
+  enable-screenshots: "true"
+  enable-real-time-updates: "true"
+  enable-metrics: "true"
+  enable-health-checks: "true"
+  
+  # Rate Limiting
+  rate-limit-requests-per-minute: "1000"
+  rate-limit-burst-size: "100"
+  
+  # Caching
+  cache-default-expiration: "3600"
+  cache-max-size: "100MB"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eam-api-config
+  namespace: eam-system
+  labels:
+    app: eam-api
+    component: config
+    version: "5.0.0"
+data:
+  appsettings.Production.json: |
+    {
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Warning",
+          "Microsoft.EntityFrameworkCore": "Warning",
+          "System.Net.Http.HttpClient": "Warning"
+        }
+      },
+      "AllowedHosts": "*",
+      "Jwt": {
+        "Issuer": "EAM.API",
+        "Audience": "EAM.Agents",
+        "ExpiryMinutes": 1440,
+        "RefreshExpiryDays": 7
+      },
+      "Storage": {
+        "Type": "MinIO",
+        "MinIO": {
+          "UseSSL": false,
+          "Region": "us-east-1"
+        }
+      },
+      "Telemetry": {
+        "ServiceName": "EAM.API",
+        "ServiceVersion": "5.0.0",
+        "EnableMetrics": true,
+        "EnableTracing": true,
+        "EnableLogging": true,
+        "SamplingRatio": 1.0
+      },
+      "RateLimiting": {
+        "EnableRateLimiting": true,
+        "RequestsPerMinute": 1000,
+        "BurstSize": 100,
+        "QueueLimit": 50
+      },
+      "HealthChecks": {
+        "HealthCheckPath": "/health",
+        "ReadinessCheckPath": "/health/ready",
+        "StartupCheckPath": "/health/startup",
+        "LivenessCheckPath": "/health/live"
+      },
+      "Features": {
+        "EnableTelemetry": true,
+        "EnableMetrics": true,
+        "EnableHealthChecks": true,
+        "EnableSwagger": false,
+        "EnableCors": true,
+        "MaxRetries": 3
+      },
+      "Kestrel": {
+        "Endpoints": {
+          "Http": {
+            "Url": "http://+:8080"
+          }
+        }
+      },
+      "OpenTelemetry": {
+        "Traces": {
+          "Enabled": true,
+          "Processors": ["otlp"]
+        },
+        "Metrics": {
+          "Enabled": true,
+          "Processors": ["otlp"]
+        },
+        "Logs": {
+          "Enabled": true,
+          "Processors": ["otlp"]
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eam-nginx-config
+  namespace: eam-system
+  labels:
+    app: eam-frontend
+    component: nginx-config
+    version: "5.0.0"
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log notice;
+    pid /var/run/nginx.pid;
+
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for"';
+
+        access_log /var/log/nginx/access.log main;
+
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        server_tokens off;
+
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1000;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types
+            application/atom+xml
+            application/geo+json
+            application/javascript
+            application/x-javascript
+            application/json
+            application/ld+json
+            application/manifest+json
+            application/rdf+xml
+            application/rss+xml
+            application/xhtml+xml
+            application/xml
+            font/eot
+            font/otf
+            font/ttf
+            image/svg+xml
+            text/css
+            text/javascript
+            text/plain
+            text/xml;
+
+        include /etc/nginx/conf.d/*.conf;
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eam-nginx-default-config
+  namespace: eam-system
+  labels:
+    app: eam-frontend
+    component: nginx-default-config
+    version: "5.0.0"
+data:
+  default.conf: |
+    upstream eam_api {
+        server eam-api-service:80;
+        keepalive 32;
+    }
+
+    server {
+        listen 80;
+        server_name localhost;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # Health check endpoint
+        location /health {
+            access_log off;
+            return 200 "OK\n";
+            add_header Content-Type text/plain;
+        }
+
+        # Nginx status for monitoring
+        location /nginx_status {
+            stub_status on;
+            access_log off;
+            allow 127.0.0.1;
+            allow 10.0.0.0/8;
+            allow 172.16.0.0/12;
+            allow 192.168.0.0/16;
+            deny all;
+        }
+
+        # API proxy
+        location /api/ {
+            proxy_pass http://eam_api;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_cache_bypass $http_upgrade;
+            
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+            
+            proxy_buffering on;
+            proxy_buffer_size 8k;
+            proxy_buffers 16 8k;
+            proxy_busy_buffers_size 16k;
+        }
+
+        # Static files with long-term caching
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+            add_header Vary Accept-Encoding;
+            gzip_static on;
+        }
+
+        # Main app files with short-term caching
+        location ~* \.(html|json|xml|txt)$ {
+            expires 1h;
+            add_header Cache-Control "public, no-cache";
+            add_header Vary Accept-Encoding;
+        }
+
+        # Angular app - serve index.html for all routes
+        location / {
+            try_files $uri $uri/ /index.html;
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            add_header Pragma no-cache;
+            add_header Expires 0;
+        }
+
+        # Security headers
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+        # Prevent access to hidden files
+        location ~ /\. {
+            deny all;
+            access_log off;
+            log_not_found off;
+        }
+
+        # Custom error pages
+        error_page 404 /404.html;
+        error_page 500 502 503 504 /50x.html;
+        
+        location = /404.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+        
+        location = /50x.html {
+            root /usr/share/nginx/html;
+            internal;
+        }
+    }

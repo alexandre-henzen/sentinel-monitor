@@ -1,0 +1,274 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 16 Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: eam-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: eam
+      POSTGRES_USER: eam_user
+      POSTGRES_PASSWORD: eam_pass
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
+      - ./database/backups:/backups
+    networks:
+      - eam-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eam_user -d eam"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  # Redis 7 for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: eam-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./storage/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - eam-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+
+  # MinIO for screenshot storage
+  minio:
+    image: minio/minio:latest
+    container_name: eam-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_DOMAIN: localhost
+    volumes:
+      - minio_data:/data
+      - ./storage/minio:/minio/config
+    command: server /data --console-address ":9001"
+    networks:
+      - eam-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.2'
+
+  # MinIO Client for setup
+  minio-setup:
+    image: minio/mc:latest
+    container_name: eam-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./storage/minio/setup-minio.sh:/setup-minio.sh
+    entrypoint: /setup-minio.sh
+    networks:
+      - eam-network
+    restart: "no"
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: eam-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    networks:
+      - eam-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: eam-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - eam-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.2'
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: eam-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - eam-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: eam-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    networks:
+      - eam-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+
+  # Database migration runner
+  db-migrate:
+    image: migrate/migrate:latest
+    container_name: eam-db-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./database/migrations:/migrations
+    command: >
+      -path=/migrations
+      -database=postgres://eam_user:eam_pass@postgres:5432/eam?sslmode=disable
+      up
+    networks:
+      - eam-network
+    restart: "no"
+
+  # PostgreSQL backup service
+  postgres-backup:
+    image: postgres:16-alpine
+    container_name: eam-postgres-backup
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./database/backups:/backups
+      - ./scripts/backup-postgres.sh:/backup-postgres.sh
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: eam
+      POSTGRES_USER: eam_user
+      POSTGRES_PASSWORD: eam_pass
+    entrypoint: /backup-postgres.sh
+    networks:
+      - eam-network
+    restart: "no"
+
+networks:
+  eam-network:
+    driver: bridge
+    name: eam-network
+
+volumes:
+  postgres_data:
+    driver: local
+    name: eam-postgres-data
+  redis_data:
+    driver: local
+    name: eam-redis-data
+  minio_data:
+    driver: local
+    name: eam-minio-data
+  prometheus_data:
+    driver: local
+    name: eam-prometheus-data
+  grafana_data:
+    driver: local
+    name: eam-grafana-data

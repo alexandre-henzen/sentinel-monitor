@@ -1,0 +1,147 @@
+<Project Sdk="WiX.Sdk/4.0.0">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <Platform>x64</Platform>
+    <OutputPath>bin\$(Configuration)\$(Platform)\</OutputPath>
+    <IntermediateOutputPath>obj\$(Configuration)\$(Platform)\</IntermediateOutputPath>
+    <PackageId>EAM.Agent</PackageId>
+    <PackageVersion>5.0.0</PackageVersion>
+    <PackageDescription>EAM Agent - Employee Activity Monitor</PackageDescription>
+    <PackageManufacturer>EAM Technologies</PackageManufacturer>
+    <PackageLanguage>1033</PackageLanguage>
+    <PackageCodepage>1252</PackageCodepage>
+    <PackageLcid>1033</PackageLcid>
+    <PackageCompressed>yes</PackageCompressed>
+    <PackageInstallerVersion>500</PackageInstallerVersion>
+    <PackageComments>EAM Agent installer package</PackageComments>
+    <PackageKeywords>EAM;Agent;Monitor;Employee;Activity</PackageKeywords>
+    <PackageScope>perMachine</PackageScope>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageIcon>eam-icon.ico</PackageIcon>
+    <WixToolsetPath>$(MSBuildProgramFiles32)\WiX Toolset v4.0\bin</WixToolsetPath>
+    <AllowSameVersionUpgrades>yes</AllowSameVersionUpgrades>
+    <SuppressValidation>ICE61</SuppressValidation>
+    <EnableFirewallExceptions>true</EnableFirewallExceptions>
+    <EnableHeatTransforms>true</EnableHeatTransforms>
+    <HeatToolPath>$(WixToolsetPath)\heat.exe</HeatToolPath>
+    <DefineConstants>
+      ProductVersion=$(PackageVersion);
+      ProductName=EAM Agent;
+      ProductManufacturer=$(PackageManufacturer);
+      ProductUpgradeCode={12345678-1234-1234-1234-123456789012};
+      ServiceName=EAM Agent;
+      ServiceDisplayName=EAM Agent Service;
+      ServiceDescription=Employee Activity Monitor Agent Service;
+      InstallDir=EAM Agent;
+      ProgramFilesFolder=ProgramFiles64Folder;
+      BinPath=..\..\src\EAM.Agent\bin\Release\net8.0\win-x64\publish;
+      ComponentGuid={87654321-4321-4321-4321-210987654321};
+      ExecutableGuid={11111111-2222-3333-4444-555555555555};
+      ServiceGuid={66666666-7777-8888-9999-000000000000};
+      FirewallGuid={AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE};
+      RegistryGuid={FFFFFFFF-EEEE-DDDD-CCCC-BBBBBBBBBBBB};
+      AppDataGuid={12121212-3434-5656-7878-909090909090};
+      LogsGuid={13131313-3535-5757-7979-919191919191};
+      BackupGuid={14141414-3636-5858-8080-929292929292};
+      ConfigGuid={15151515-3737-5959-8181-939393939393};
+      PluginGuid={16161616-3838-6060-8282-949494949494};
+      UninstallGuid={17171717-3939-6161-8383-959595959595};
+      StartMenuGuid={18181818-4040-6262-8484-969696969696};
+      DesktopGuid={19191919-4141-6363-8585-979797979797};
+      EventLogGuid={20202020-4242-6464-8686-989898989898};
+      PerformanceGuid={21212121-4343-6565-8787-999999999999};
+      SecurityGuid={22222222-4444-6666-8888-101010101010};
+      NetworkGuid={23232323-4545-6767-8989-111111111111};
+      CertificateGuid={24242424-4646-6868-9090-121212121212};
+      UpdateGuid={25252525-4747-6969-9191-131313131313};
+      TelemetryGuid={26262626-4848-7070-9292-141414141414};
+      DatabaseGuid={27272727-4949-7171-9393-151515151515};
+      PluginsDirGuid={28282828-5050-7272-9494-161616161616};
+      TempGuid={29292929-5151-7373-9595-171717171717};
+      CacheGuid={30303030-5252-7474-9696-181818181818};
+      RuntimeGuid={31313131-5353-7575-9797-191919191919};
+      FrameworkGuid={32323232-5454-7676-9898-202020202020};
+      MsiLogGuid={33333333-5555-7777-9999-212121212121};
+      WixGuid={34343434-5656-7878-1010-222222222222};
+      EnvironmentGuid={35353535-5757-7979-1111-232323232323};
+      PathGuid={36363636-5858-8080-1212-242424242424};
+      InstallScopeGuid={37373737-5959-8181-1313-252525252525};
+      UpgradeGuid={38383838-6060-8282-1414-262626262626};
+      RemoveGuid={39393939-6161-8383-1515-272727272727};
+      RepairGuid={40404040-6262-8484-1616-282828282828};
+      ModifyGuid={41414141-6363-8585-1717-292929292929};
+      MaintenanceGuid={42424242-6464-8686-1818-303030303030};
+      RebootGuid={43434343-6565-8787-1919-313131313131};
+      ProgressGuid={44444444-6666-8888-2020-323232323232};
+      ErrorGuid={45454545-6767-8989-2121-333333333333};
+      WarningGuid={46464646-6868-9090-2222-343434343434};
+      InfoGuid={47474747-6969-9191-2323-353535353535};
+      SuccessGuid={48484848-7070-9292-2424-363636363636};
+      CancelGuid={49494949-7171-9393-2525-373737373737};
+      RollbackGuid={50505050-7272-9494-2626-383838383838};
+      CommitGuid={51515151-7373-9595-2727-393939393939};
+    </DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WiX.Sdk" Version="4.0.0" />
+    <PackageReference Include="WiX.Heat" Version="4.0.0" />
+    <PackageReference Include="WiX.Toolset.Core" Version="4.0.0" />
+    <PackageReference Include="WiX.Extensions.Util" Version="4.0.0" />
+    <PackageReference Include="WiX.Extensions.Firewall" Version="4.0.0" />
+    <PackageReference Include="WiX.Extensions.UI" Version="4.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Product.wxs" />
+    <Compile Include="Features.wxs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="README.md" />
+    <Content Include="LICENSE.txt" />
+    <Content Include="eam-icon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\**" />
+  </ItemGroup>
+
+  <Target Name="BeforeBuild">
+    <Message Text="Building EAM Agent MSI installer..." Importance="high" />
+    <Message Text="Product Version: $(PackageVersion)" Importance="high" />
+    <Message Text="Target Platform: $(Platform)" Importance="high" />
+    <Message Text="Configuration: $(Configuration)" Importance="high" />
+    <Message Text="Binary Path: $(BinPath)" Importance="high" />
+    
+    <!-- Verify that the binary path exists -->
+    <Error Text="Binary path does not exist: $(BinPath)" Condition="!Exists('$(BinPath)')" />
+    
+    <!-- Verify that the main executable exists -->
+    <Error Text="Main executable not found: $(BinPath)\EAM.Agent.exe" Condition="!Exists('$(BinPath)\EAM.Agent.exe')" />
+    
+    <!-- Generate heat files for dynamic content -->
+    <Message Text="Generating heat files for application binaries..." Importance="high" />
+  </Target>
+
+  <Target Name="AfterBuild">
+    <Message Text="EAM Agent MSI installer built successfully!" Importance="high" />
+    <Message Text="Output: $(OutputPath)$(PackageId).msi" Importance="high" />
+    
+    <!-- Copy MSI to a predictable location -->
+    <Copy SourceFiles="$(OutputPath)$(PackageId).msi" 
+          DestinationFiles="$(OutputPath)EAM.Agent.v$(PackageVersion).msi" 
+          OverwriteReadOnlyFiles="true" />
+    
+    <Message Text="MSI copied to: $(OutputPath)EAM.Agent.v$(PackageVersion).msi" Importance="high" />
+  </Target>
+
+  <Target Name="Clean">
+    <RemoveDir Directories="$(OutputPath)" />
+    <RemoveDir Directories="$(IntermediateOutputPath)" />
+  </Target>
+
+  <Target Name="Rebuild" DependsOnTargets="Clean;Build" />
+</Project>

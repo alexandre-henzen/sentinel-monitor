@@ -1,0 +1,276 @@
+# Default values for EAM chart
+# This is a YAML-formatted file.
+
+# Global configuration
+global:
+  imageRegistry: "ghcr.io"
+  imagePullSecrets: []
+  storageClass: ""
+
+# Common labels
+commonLabels:
+  app.kubernetes.io/name: eam
+  app.kubernetes.io/version: "5.0.0"
+  app.kubernetes.io/part-of: employee-activity-monitor
+
+# API configuration
+api:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: ghcr.io/company/eam-api
+    tag: "5.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  probes:
+    liveness:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readiness:
+      enabled: true
+      path: /health/ready
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    startup:
+      enabled: true
+      path: /health/startup
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 6
+
+# Frontend configuration
+frontend:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: ghcr.io/company/eam-frontend
+    tag: "5.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+  probes:
+    liveness:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readiness:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+# Agent configuration (for future use)
+agent:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: ghcr.io/company/eam-agent
+    tag: "5.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/rate-limit-rpm: "100"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: eam.company.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+    - host: api.eam.company.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api
+  tls:
+    - secretName: eam-tls-secret
+      hosts:
+        - eam.company.com
+        - api.eam.company.com
+
+# ConfigMap configuration
+config:
+  # API Configuration
+  api:
+    environment: production
+    logLevel: Information
+    corsOrigins: "https://eam.company.com,https://api.eam.company.com"
+    allowedHosts: "eam.company.com,api.eam.company.com"
+    
+  # Frontend Configuration
+  frontend:
+    apiUrl: "https://api.eam.company.com"
+    authIssuer: "https://auth.eam.company.com"
+    authClientId: "eam-frontend"
+    
+  # Feature flags
+  features:
+    enableTelemetry: true
+    enableScreenshots: true
+    enableRealTimeUpdates: true
+    enableMetrics: true
+    enableHealthChecks: true
+
+# Secret configuration (references to existing secrets)
+secrets:
+  name: eam-secrets
+  keys:
+    databasePassword: database-password
+    jwtSecret: jwt-secret-key
+    minioAccessKey: minio-access-key
+    minioSecretKey: minio-secret-key
+
+# Database configuration (PostgreSQL)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "postgres-password"
+    database: "eam"
+    username: "eam_user"
+    password: "eam-password"
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+
+# Redis configuration
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "redis-password"
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+# MinIO configuration
+minio:
+  enabled: true
+  auth:
+    rootUser: "minioadmin"
+    rootPassword: "minioadmin-password"
+  persistence:
+    enabled: true
+    size: 100Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+  prometheusRule:
+    enabled: true
+    namespace: monitoring
+
+# Security configuration
+security:
+  podSecurityPolicy:
+    enabled: false
+  networkPolicy:
+    enabled: true
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: 30
+
+# Node selector and tolerations
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Extra environment variables
+extraEnvVars: []
+extraEnvVarsCM: ""
+extraEnvVarsSecret: ""
+
+# Extra volumes
+extraVolumes: []
+extraVolumeMounts: []

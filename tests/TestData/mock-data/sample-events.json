@@ -1,0 +1,159 @@
+[
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "agentId": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    "activityType": "WindowChange",
+    "processName": "chrome",
+    "windowTitle": "Google Chrome - New Tab",
+    "timestamp": "2025-01-15T10:30:00.000Z",
+    "metadata": {
+      "processId": 1234,
+      "windowHandle": 567890,
+      "previousWindow": "Desktop",
+      "duration": 1500,
+      "testData": true
+    }
+  },
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d480",
+    "agentId": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    "activityType": "BrowserNavigation",
+    "processName": "chrome",
+    "windowTitle": "Google Chrome - GitHub",
+    "timestamp": "2025-01-15T10:31:30.000Z",
+    "metadata": {
+      "url": "https://github.com",
+      "domain": "github.com",
+      "browserType": "chrome",
+      "tabId": 1,
+      "isIncognito": false,
+      "testData": true
+    }
+  },
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d481",
+    "agentId": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    "activityType": "KeyPress",
+    "processName": "notepad",
+    "windowTitle": "Untitled - Notepad",
+    "timestamp": "2025-01-15T10:32:00.000Z",
+    "metadata": {
+      "keyCode": 65,
+      "key": "A",
+      "isShift": false,
+      "isCtrl": false,
+      "isAlt": false,
+      "testData": true
+    }
+  },
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d482",
+    "agentId": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    "activityType": "MouseClick",
+    "processName": "explorer",
+    "windowTitle": "Documents - File Explorer",
+    "timestamp": "2025-01-15T10:33:00.000Z",
+    "metadata": {
+      "x": 150,
+      "y": 200,
+      "button": "left",
+      "clickCount": 1,
+      "testData": true
+    }
+  },
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d483",
+    "agentId": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    "activityType": "TeamsActivity",
+    "processName": "Teams",
+    "windowTitle": "Microsoft Teams - Daily Standup",
+    "timestamp": "2025-01-15T10:34:00.000Z",
+    "metadata": {
+      "meetingId": "meeting-123-456",
+      "meetingTitle": "Daily Standup",
+      "participantCount": 5,
+      "meetingType": "video",
+      "isOrganizer": false,
+      "testData": true
+    }
+  },
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d484",
+    "agentId": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    "activityType": "Screenshot",
+    "processName": "system",
+    "windowTitle": "Screenshot Capture",
+    "timestamp": "2025-01-15T10:35:00.000Z",
+    "metadata": {
+      "screenshotId": "screenshot-789-012",
+      "width": 1920,
+      "height": 1080,
+      "format": "png",
+      "quality": 85,
+      "fileSize": 2048576,
+      "testData": true
+    }
+  },
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d485",
+    "agentId": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    "activityType": "CustomActivity",
+    "processName": "custom-app",
+    "windowTitle": "Custom Application",
+    "timestamp": "2025-01-15T10:36:00.000Z",
+    "metadata": {
+      "customField1": "value1",
+      "customField2": 42,
+      "customField3": true,
+      "plugin": "SamplePlugin",
+      "testData": true
+    }
+  },
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d486",
+    "agentId": "b2c3d4e5-f6g7-8901-2345-678901bcdef0",
+    "activityType": "WindowChange",
+    "processName": "vscode",
+    "windowTitle": "Visual Studio Code - project.cs",
+    "timestamp": "2025-01-15T10:37:00.000Z",
+    "metadata": {
+      "processId": 5678,
+      "windowHandle": 901234,
+      "previousWindow": "Chrome",
+      "duration": 2000,
+      "testData": true
+    }
+  },
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d487",
+    "agentId": "b2c3d4e5-f6g7-8901-2345-678901bcdef0",
+    "activityType": "BrowserNavigation",
+    "processName": "firefox",
+    "windowTitle": "Mozilla Firefox - Stack Overflow",
+    "timestamp": "2025-01-15T10:38:00.000Z",
+    "metadata": {
+      "url": "https://stackoverflow.com/questions/12345",
+      "domain": "stackoverflow.com",
+      "browserType": "firefox",
+      "tabId": 3,
+      "isIncognito": false,
+      "testData": true
+    }
+  },
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d488",
+    "agentId": "b2c3d4e5-f6g7-8901-2345-678901bcdef0",
+    "activityType": "KeyPress",
+    "processName": "vscode",
+    "windowTitle": "Visual Studio Code - project.cs",
+    "timestamp": "2025-01-15T10:39:00.000Z",
+    "metadata": {
+      "keyCode": 83,
+      "key": "S",
+      "isShift": false,
+      "isCtrl": true,
+      "isAlt": false,
+      "testData": true
+    }
+  }
+]

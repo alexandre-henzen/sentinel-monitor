@@ -1,0 +1,331 @@
+name: Release Management
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v5.0.1)'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  NODE_VERSION: '18.x'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Job 1: Validate Release
+  validate-release:
+    runs-on: ubuntu-latest
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-prerelease: ${{ steps.version.outputs.is-prerelease }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Extract version
+      id: version
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION="${{ github.ref_name }}"
+        fi
+        
+        # Remove 'v' prefix if present
+        VERSION=${VERSION#v}
+        
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        
+        # Check if it's a prerelease (contains alpha, beta, rc)
+        if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
+          echo "is-prerelease=true" >> $GITHUB_OUTPUT
+        else
+          echo "is-prerelease=false" >> $GITHUB_OUTPUT
+        fi
+        
+        echo "Release version: $VERSION"
+    
+    - name: Validate version format
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-](alpha|beta|rc)[0-9]*)?$ ]]; then
+          echo "Invalid version format: $VERSION"
+          exit 1
+        fi
+    
+    - name: Check if version exists
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        if git tag -l | grep -q "^v$VERSION$"; then
+          echo "Version v$VERSION already exists"
+          exit 1
+        fi
+
+  # Job 2: Build Release Artifacts
+  build-release:
+    runs-on: ubuntu-latest
+    needs: validate-release
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: src/package-lock.json
+    
+    - name: Update version in project files
+      run: |
+        VERSION="${{ needs.validate-release.outputs.version }}"
+        
+        # Update .NET project versions
+        find . -name "*.csproj" -exec sed -i "s/<Version>.*<\/Version>/<Version>$VERSION<\/Version>/g" {} \;
+        find . -name "*.csproj" -exec sed -i "s/<AssemblyVersion>.*<\/AssemblyVersion>/<AssemblyVersion>$VERSION<\/AssemblyVersion>/g" {} \;
+        find . -name "*.csproj" -exec sed -i "s/<FileVersion>.*<\/FileVersion>/<FileVersion>$VERSION<\/FileVersion>/g" {} \;
+        
+        # Update package.json version
+        cd src && npm version $VERSION --no-git-tag-version
+    
+    - name: Restore .NET dependencies
+      run: dotnet restore EAM.sln
+    
+    - name: Build .NET solution
+      run: dotnet build EAM.sln --configuration Release --no-restore
+    
+    - name: Test .NET solution
+      run: dotnet test EAM.sln --configuration Release --no-build
+    
+    - name: Install NPM dependencies
+      run: npm ci
+      working-directory: src
+    
+    - name: Build Angular application
+      run: npm run build:prod
+      working-directory: src
+    
+    - name: Create release packages
+      run: |
+        VERSION="${{ needs.validate-release.outputs.version }}"
+        
+        # Create Agent package
+        dotnet publish src/EAM.Agent/EAM.Agent.csproj \
+          --configuration Release \
+          --output ./release/Agent \
+          --runtime win-x64 \
+          --self-contained true
+        
+        # Create API package
+        dotnet publish src/EAM.API/EAM.API.csproj \
+          --configuration Release \
+          --output ./release/API \
+          --runtime linux-x64 \
+          --self-contained false
+        
+        # Create Frontend package
+        cp -r src/dist/* ./release/Frontend/
+        
+        # Create deployment scripts package
+        cp -r deploy/ ./release/Deploy/
+        
+        # Create release archives
+        cd release
+        tar -czf ../EAM-Agent-v$VERSION-win-x64.tar.gz Agent/
+        tar -czf ../EAM-API-v$VERSION-linux-x64.tar.gz API/
+        tar -czf ../EAM-Frontend-v$VERSION.tar.gz Frontend/
+        tar -czf ../EAM-Deploy-v$VERSION.tar.gz Deploy/
+        
+        # Create full release package
+        cd ..
+        tar -czf EAM-Complete-v$VERSION.tar.gz release/
+    
+    - name: Upload release artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-artifacts
+        path: |
+          EAM-*.tar.gz
+        retention-days: 30
+
+  # Job 3: Build and Push Docker Images
+  build-docker-release:
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-release]
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    strategy:
+      matrix:
+        component: [agent, api, frontend]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}
+        tags: |
+          type=semver,pattern={{version}},value=v${{ needs.validate-release.outputs.version }}
+          type=semver,pattern={{major}}.{{minor}},value=v${{ needs.validate-release.outputs.version }}
+          type=semver,pattern={{major}},value=v${{ needs.validate-release.outputs.version }}
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./deploy/docker/${{ matrix.component }}.Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        platforms: linux/amd64,linux/arm64
+        build-args: |
+          VERSION=${{ needs.validate-release.outputs.version }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Job 4: Create GitHub Release
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-release, build-docker-release]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Download release artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: release-artifacts
+        path: ./artifacts/
+    
+    - name: Generate changelog
+      id: changelog
+      run: |
+        VERSION="${{ needs.validate-release.outputs.version }}"
+        
+        # Get previous tag
+        PREV_TAG=$(git tag -l "v*" | sort -V | tail -n 2 | head -n 1)
+        
+        if [ -z "$PREV_TAG" ]; then
+          PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+        fi
+        
+        # Generate changelog
+        echo "## What's Changed" > changelog.md
+        echo "" >> changelog.md
+        
+        git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD >> changelog.md
+        
+        echo "" >> changelog.md
+        echo "## Docker Images" >> changelog.md
+        echo "" >> changelog.md
+        echo "- \`ghcr.io/${{ github.repository }}-agent:$VERSION\`" >> changelog.md
+        echo "- \`ghcr.io/${{ github.repository }}-api:$VERSION\`" >> changelog.md
+        echo "- \`ghcr.io/${{ github.repository }}-frontend:$VERSION\`" >> changelog.md
+        
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat changelog.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ needs.validate-release.outputs.version }}
+        name: EAM v${{ needs.validate-release.outputs.version }}
+        body: ${{ steps.changelog.outputs.changelog }}
+        prerelease: ${{ needs.validate-release.outputs.is-prerelease }}
+        files: |
+          artifacts/EAM-*.tar.gz
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 5: Deploy to Production (if not prerelease)
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [validate-release, create-release]
+    if: needs.validate-release.outputs.is-prerelease == 'false'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+    
+    - name: Configure kubeconfig
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+    
+    - name: Backup production database
+      run: |
+        ./deploy/scripts/backup.sh production
+    
+    - name: Deploy to production
+      run: |
+        ./deploy/scripts/deploy.sh production ${{ needs.validate-release.outputs.version }}
+    
+    - name: Run health checks
+      run: |
+        ./deploy/scripts/health-check.sh production
+    
+    - name: Rollback on failure
+      if: failure()
+      run: |
+        ./deploy/scripts/rollback.sh production
+    
+    - name: Update deployment status
+      if: always()
+      run: |
+        STATUS=${{ job.status }}
+        VERSION=${{ needs.validate-release.outputs.version }}
+        
+        # Update deployment status in database or monitoring system
+        curl -X POST "${{ secrets.DEPLOYMENT_WEBHOOK }}" \
+          -H "Content-Type: application/json" \
+          -d "{\"version\":\"$VERSION\",\"environment\":\"production\",\"status\":\"$STATUS\"}"

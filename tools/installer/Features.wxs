@@ -1,0 +1,516 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    
+    <!-- Feature Tree Definition -->
+    <Feature Id="Complete" 
+             Title="EAM Agent Complete Installation" 
+             Description="Complete installation of EAM Agent with all features."
+             Level="1"
+             Display="expand"
+             ConfigurableDirectory="APPLICATIONFOLDER"
+             AllowAdvertise="no"
+             InstallDefault="local">
+
+      <!-- Core Feature (Required) -->
+      <Feature Id="CoreFeature" 
+               Title="EAM Agent Core" 
+               Description="Core EAM Agent application files and service. This feature is required."
+               Level="1"
+               AllowAdvertise="no"
+               InstallDefault="local"
+               Absent="disallow">
+        
+        <ComponentRef Id="MainApplication" />
+        <ComponentRef Id="WindowsService" />
+        
+        <!-- Sub-features for Core -->
+        <Feature Id="CoreRuntime" 
+                 Title="Runtime Components" 
+                 Description="Essential runtime components required for EAM Agent operation."
+                 Level="1"
+                 AllowAdvertise="no"
+                 InstallDefault="local"
+                 Absent="disallow">
+          <!-- Runtime components will be added here -->
+        </Feature>
+
+        <Feature Id="CoreConfiguration" 
+                 Title="Configuration Files" 
+                 Description="Default configuration files and settings."
+                 Level="1"
+                 AllowAdvertise="no"
+                 InstallDefault="local"
+                 Absent="disallow">
+          <!-- Configuration components will be added here -->
+        </Feature>
+      </Feature>
+
+      <!-- Security Feature -->
+      <Feature Id="SecurityFeature" 
+               Title="Security Components" 
+               Description="Security-related components including firewall exceptions and certificates."
+               Level="1"
+               AllowAdvertise="no"
+               InstallDefault="local">
+        
+        <ComponentRef Id="FirewallException" />
+        
+        <Feature Id="CertificateManagement" 
+                 Title="Certificate Management" 
+                 Description="SSL certificates and digital signature validation components."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Certificate components will be added here -->
+        </Feature>
+
+        <Feature Id="SecurityPolicies" 
+                 Title="Security Policies" 
+                 Description="Security policies and access control configurations."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Security policy components will be added here -->
+        </Feature>
+      </Feature>
+
+      <!-- User Interface Feature -->
+      <Feature Id="UserInterfaceFeature" 
+               Title="User Interface Components" 
+               Description="Start menu shortcuts, desktop icons, and user interface elements."
+               Level="1"
+               AllowAdvertise="no"
+               InstallDefault="local">
+        
+        <ComponentRef Id="StartMenuShortcuts" />
+        <ComponentRef Id="DesktopShortcut" />
+        
+        <Feature Id="StartMenuIntegration" 
+                 Title="Start Menu Integration" 
+                 Description="Add EAM Agent shortcuts to the Start Menu."
+                 Level="1"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Start menu integration is handled by StartMenuShortcuts component -->
+        </Feature>
+
+        <Feature Id="DesktopIntegration" 
+                 Title="Desktop Integration" 
+                 Description="Add EAM Agent shortcut to the Desktop."
+                 Level="100"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- Desktop integration is handled by DesktopShortcut component -->
+        </Feature>
+
+        <Feature Id="SystemTrayIntegration" 
+                 Title="System Tray Integration" 
+                 Description="System tray icon and context menu integration."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- System tray components will be added here -->
+        </Feature>
+      </Feature>
+
+      <!-- Monitoring Feature -->
+      <Feature Id="MonitoringFeature" 
+               Title="Monitoring and Diagnostics" 
+               Description="Performance monitoring, logging, and diagnostic tools."
+               Level="1"
+               AllowAdvertise="no"
+               InstallDefault="local">
+        
+        <ComponentRef Id="EventLogSource" />
+        <ComponentRef Id="PerformanceCounters" />
+        
+        <Feature Id="EventLogging" 
+                 Title="Event Logging" 
+                 Description="Windows Event Log integration for system events and errors."
+                 Level="1"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Event logging is handled by EventLogSource component -->
+        </Feature>
+
+        <Feature Id="PerformanceMonitoring" 
+                 Title="Performance Monitoring" 
+                 Description="Performance counters and system metrics collection."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Performance monitoring is handled by PerformanceCounters component -->
+        </Feature>
+
+        <Feature Id="DiagnosticTools" 
+                 Title="Diagnostic Tools" 
+                 Description="Diagnostic utilities and troubleshooting tools."
+                 Level="100"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- Diagnostic tool components will be added here -->
+        </Feature>
+
+        <Feature Id="AdvancedLogging" 
+                 Title="Advanced Logging" 
+                 Description="Enhanced logging capabilities with detailed trace information."
+                 Level="100"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- Advanced logging components will be added here -->
+        </Feature>
+      </Feature>
+
+      <!-- Update System Feature -->
+      <Feature Id="UpdateFeature" 
+               Title="Automatic Updates" 
+               Description="Automatic update system for keeping EAM Agent up-to-date."
+               Level="1"
+               AllowAdvertise="no"
+               InstallDefault="local">
+        
+        <Feature Id="AutoUpdateService" 
+                 Title="Auto-Update Service" 
+                 Description="Automatic update checking and installation service."
+                 Level="1"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Auto-update service components will be added here -->
+        </Feature>
+
+        <Feature Id="UpdateScheduler" 
+                 Title="Update Scheduler" 
+                 Description="Scheduled update checking and maintenance windows."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Update scheduler components will be added here -->
+        </Feature>
+
+        <Feature Id="UpdateValidation" 
+                 Title="Update Validation" 
+                 Description="Digital signature verification and update integrity checking."
+                 Level="1"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Update validation components will be added here -->
+        </Feature>
+
+        <Feature Id="RollbackSupport" 
+                 Title="Rollback Support" 
+                 Description="Automatic rollback capability for failed updates."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Rollback support components will be added here -->
+        </Feature>
+      </Feature>
+
+      <!-- Plugin System Feature -->
+      <Feature Id="PluginFeature" 
+               Title="Plugin System" 
+               Description="Plugin architecture for extending EAM Agent functionality."
+               Level="10"
+               AllowAdvertise="no"
+               InstallDefault="local">
+        
+        <Feature Id="PluginFramework" 
+                 Title="Plugin Framework" 
+                 Description="Core plugin loading and management framework."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Plugin framework components will be added here -->
+        </Feature>
+
+        <Feature Id="PluginSDK" 
+                 Title="Plugin SDK" 
+                 Description="Software Development Kit for creating custom plugins."
+                 Level="100"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- Plugin SDK components will be added here -->
+        </Feature>
+
+        <Feature Id="DefaultPlugins" 
+                 Title="Default Plugins" 
+                 Description="Standard set of plugins for common monitoring scenarios."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Default plugin components will be added here -->
+        </Feature>
+      </Feature>
+
+      <!-- Telemetry Feature -->
+      <Feature Id="TelemetryFeature" 
+               Title="Telemetry and Analytics" 
+               Description="Usage analytics and telemetry collection for service improvement."
+               Level="10"
+               AllowAdvertise="no"
+               InstallDefault="local">
+        
+        <Feature Id="UsageAnalytics" 
+                 Title="Usage Analytics" 
+                 Description="Anonymous usage statistics and performance metrics."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Usage analytics components will be added here -->
+        </Feature>
+
+        <Feature Id="CrashReporting" 
+                 Title="Crash Reporting" 
+                 Description="Automatic crash reporting and error diagnostics."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Crash reporting components will be added here -->
+        </Feature>
+
+        <Feature Id="TelemetryDashboard" 
+                 Title="Telemetry Dashboard" 
+                 Description="Local dashboard for viewing telemetry data and system health."
+                 Level="100"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- Telemetry dashboard components will be added here -->
+        </Feature>
+      </Feature>
+
+      <!-- Developer Tools Feature -->
+      <Feature Id="DeveloperFeature" 
+               Title="Developer Tools" 
+               Description="Development and debugging tools for advanced users."
+               Level="200"
+               AllowAdvertise="no"
+               InstallDefault="advertise">
+        
+        <Feature Id="DebugTools" 
+                 Title="Debug Tools" 
+                 Description="Debugging utilities and diagnostic tools for developers."
+                 Level="200"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- Debug tool components will be added here -->
+        </Feature>
+
+        <Feature Id="APIDocumentation" 
+                 Title="API Documentation" 
+                 Description="Local API documentation and integration guides."
+                 Level="200"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- API documentation components will be added here -->
+        </Feature>
+
+        <Feature Id="ConfigurationTools" 
+                 Title="Configuration Tools" 
+                 Description="Advanced configuration utilities and schema editors."
+                 Level="200"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- Configuration tool components will be added here -->
+        </Feature>
+
+        <Feature Id="TestingFramework" 
+                 Title="Testing Framework" 
+                 Description="Unit testing and integration testing framework."
+                 Level="200"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- Testing framework components will be added here -->
+        </Feature>
+      </Feature>
+
+      <!-- Language Packs Feature -->
+      <Feature Id="LanguageFeature" 
+               Title="Language Packs" 
+               Description="Additional language support and localization files."
+               Level="100"
+               AllowAdvertise="no"
+               InstallDefault="advertise">
+        
+        <Feature Id="EnglishLanguagePack" 
+                 Title="English (Default)" 
+                 Description="English language pack (default installation)."
+                 Level="1"
+                 AllowAdvertise="no"
+                 InstallDefault="local"
+                 Absent="disallow">
+          <!-- English language pack components will be added here -->
+        </Feature>
+
+        <Feature Id="PortugueseLanguagePack" 
+                 Title="Portuguese (Brazil)" 
+                 Description="Portuguese (Brazil) language pack."
+                 Level="100"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- Portuguese language pack components will be added here -->
+        </Feature>
+
+        <Feature Id="SpanishLanguagePack" 
+                 Title="Spanish" 
+                 Description="Spanish language pack."
+                 Level="100"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- Spanish language pack components will be added here -->
+        </Feature>
+
+        <Feature Id="FrenchLanguagePack" 
+                 Title="French" 
+                 Description="French language pack."
+                 Level="100"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- French language pack components will be added here -->
+        </Feature>
+
+        <Feature Id="GermanLanguagePack" 
+                 Title="German" 
+                 Description="German language pack."
+                 Level="100"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- German language pack components will be added here -->
+        </Feature>
+      </Feature>
+
+      <!-- Documentation Feature -->
+      <Feature Id="DocumentationFeature" 
+               Title="Documentation" 
+               Description="User manuals, help files, and documentation."
+               Level="10"
+               AllowAdvertise="no"
+               InstallDefault="local">
+        
+        <Feature Id="UserManual" 
+                 Title="User Manual" 
+                 Description="Complete user manual and getting started guide."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- User manual components will be added here -->
+        </Feature>
+
+        <Feature Id="AdminGuide" 
+                 Title="Administrator Guide" 
+                 Description="System administrator configuration and deployment guide."
+                 Level="100"
+                 AllowAdvertise="no"
+                 InstallDefault="advertise">
+          <!-- Administrator guide components will be added here -->
+        </Feature>
+
+        <Feature Id="TroubleshootingGuide" 
+                 Title="Troubleshooting Guide" 
+                 Description="Troubleshooting and problem resolution guide."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Troubleshooting guide components will be added here -->
+        </Feature>
+
+        <Feature Id="ReleaseNotes" 
+                 Title="Release Notes" 
+                 Description="Release notes and change log documentation."
+                 Level="10"
+                 AllowAdvertise="no"
+                 InstallDefault="local">
+          <!-- Release notes components will be added here -->
+        </Feature>
+      </Feature>
+
+    </Feature>
+
+    <!-- Feature Conditions -->
+    <Condition Level="0" Feature="DesktopIntegration">
+      <![CDATA[INSTALL_DESKTOP_SHORTCUT <> "1"]]>
+    </Condition>
+
+    <Condition Level="0" Feature="DeveloperFeature">
+      <![CDATA[INSTALL_DEVELOPER_TOOLS <> "1"]]>
+    </Condition>
+
+    <Condition Level="0" Feature="TelemetryFeature">
+      <![CDATA[INSTALL_TELEMETRY <> "1"]]>
+    </Condition>
+
+    <Condition Level="0" Feature="PluginFeature">
+      <![CDATA[INSTALL_PLUGINS <> "1"]]>
+    </Condition>
+
+    <Condition Level="0" Feature="UpdateFeature">
+      <![CDATA[INSTALL_UPDATES <> "1"]]>
+    </Condition>
+
+    <Condition Level="0" Feature="SecurityFeature">
+      <![CDATA[INSTALL_SECURITY <> "1"]]>
+    </Condition>
+
+    <Condition Level="0" Feature="MonitoringFeature">
+      <![CDATA[INSTALL_MONITORING <> "1"]]>
+    </Condition>
+
+    <Condition Level="0" Feature="LanguageFeature">
+      <![CDATA[INSTALL_LANGUAGE_PACKS <> "1"]]>
+    </Condition>
+
+    <Condition Level="0" Feature="DocumentationFeature">
+      <![CDATA[INSTALL_DOCUMENTATION <> "1"]]>
+    </Condition>
+
+    <!-- Feature Dependencies -->
+    <Condition Level="0" Feature="PluginSDK">
+      <![CDATA[NOT &PluginFramework=3]]>
+    </Condition>
+
+    <Condition Level="0" Feature="TelemetryDashboard">
+      <![CDATA[NOT &UsageAnalytics=3]]>
+    </Condition>
+
+    <Condition Level="0" Feature="RollbackSupport">
+      <![CDATA[NOT &AutoUpdateService=3]]>
+    </Condition>
+
+    <Condition Level="0" Feature="UpdateValidation">
+      <![CDATA[NOT &AutoUpdateService=3]]>
+    </Condition>
+
+    <Condition Level="0" Feature="DiagnosticTools">
+      <![CDATA[NOT &EventLogging=3]]>
+    </Condition>
+
+    <Condition Level="0" Feature="AdvancedLogging">
+      <![CDATA[NOT &EventLogging=3]]>
+    </Condition>
+
+    <Condition Level="0" Feature="TestingFramework">
+      <![CDATA[NOT &DebugTools=3]]>
+    </Condition>
+
+    <Condition Level="0" Feature="ConfigurationTools">
+      <![CDATA[NOT &DebugTools=3]]>
+    </Condition>
+
+    <Condition Level="0" Feature="APIDocumentation">
+      <![CDATA[NOT &DebugTools=3]]>
+    </Condition>
+
+    <!-- Feature Installation Messages -->
+    <Property Id="FEATURE_CORE_INSTALL_MESSAGE" Value="Installing EAM Agent core components..." />
+    <Property Id="FEATURE_SECURITY_INSTALL_MESSAGE" Value="Configuring security components..." />
+    <Property Id="FEATURE_UI_INSTALL_MESSAGE" Value="Installing user interface components..." />
+    <Property Id="FEATURE_MONITORING_INSTALL_MESSAGE" Value="Setting up monitoring and diagnostics..." />
+    <Property Id="FEATURE_UPDATE_INSTALL_MESSAGE" Value="Configuring automatic update system..." />
+    <Property Id="FEATURE_PLUGIN_INSTALL_MESSAGE" Value="Installing plugin system..." />
+    <Property Id="FEATURE_TELEMETRY_INSTALL_MESSAGE" Value="Setting up telemetry and analytics..." />
+    <Property Id="FEATURE_DEVELOPER_INSTALL_MESSAGE" Value="Installing developer tools..." />
+    <Property Id="FEATURE_LANGUAGE_INSTALL_MESSAGE" Value="Installing language packs..." />
+    <Property Id="FEATURE_DOCUMENTATION_INSTALL_MESSAGE" Value="Installing documentation..." />
+
+  </Fragment>
+</Wix>

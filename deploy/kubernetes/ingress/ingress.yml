@@ -1,0 +1,245 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eam-ingress
+  namespace: eam-system
+  labels:
+    app: eam
+    component: ingress
+    tier: frontend
+    version: "5.0.0"
+    app.kubernetes.io/name: eam
+    app.kubernetes.io/version: "5.0.0"
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: employee-activity-monitor
+    app.kubernetes.io/managed-by: kubernetes
+  annotations:
+    # Nginx Ingress Controller annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit-rpm: "100"
+    nginx.ingress.kubernetes.io/rate-limit-connections: "10"
+    
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://eam.company.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Requested-With"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "DENY" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" always;
+      add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    
+    # Load balancer
+    nginx.ingress.kubernetes.io/load-balance: "round_robin"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    
+    # SSL/TLS
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
+    
+    # Cert-manager
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    
+    # Monitoring
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "10254"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - eam.company.com
+        - api.eam.company.com
+      secretName: eam-tls-secret
+  rules:
+    # Frontend rules
+    - host: eam.company.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: eam-frontend-service
+                port:
+                  number: 80
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: eam-frontend-service
+                port:
+                  number: 80
+          - path: /nginx_status
+            pathType: Exact
+            backend:
+              service:
+                name: eam-frontend-service
+                port:
+                  number: 80
+    
+    # API rules
+    - host: api.eam.company.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: eam-api-service
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: eam-api-service
+                port:
+                  number: 80
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: eam-api-service
+                port:
+                  number: 80
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: eam-api-service
+                port:
+                  number: 8080
+    
+    # Alternative API access through main domain
+    - host: eam.company.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: eam-api-service
+                port:
+                  number: 80
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: eam-tls-secret
+  namespace: eam-system
+  labels:
+    app: eam
+    component: tls
+type: kubernetes.io/tls
+data:
+  # These will be populated by cert-manager
+  tls.crt: ""
+  tls.key: ""
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: eam-cert
+  namespace: eam-system
+  labels:
+    app: eam
+    component: certificate
+spec:
+  secretName: eam-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: eam.company.com
+  dnsNames:
+    - eam.company.com
+    - api.eam.company.com
+  usages:
+    - digital signature
+    - key encipherment
+  duration: 2160h # 90 days
+  renewBefore: 720h # 30 days
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: eam-ingress-network-policy
+  namespace: eam-system
+  labels:
+    app: eam
+    component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: eam-frontend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 80
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: eam-api-network-policy
+  namespace: eam-system
+  labels:
+    app: eam
+    component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: eam-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: eam-system
+      ports:
+        - protocol: TCP
+          port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080

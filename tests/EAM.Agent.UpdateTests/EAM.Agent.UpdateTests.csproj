@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>EAM.Agent.UpdateTests</RootNamespace>
+    <AssemblyName>EAM.Agent.UpdateTests</AssemblyName>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AssemblyTitle>EAM Agent Update System Tests</AssemblyTitle>
+    <AssemblyDescription>Unit and integration tests for EAM Agent auto-update system</AssemblyDescription>
+    <AssemblyConfiguration>$(Configuration)</AssemblyConfiguration>
+    <AssemblyCompany>EAM Technologies</AssemblyCompany>
+    <AssemblyProduct>EAM Agent</AssemblyProduct>
+    <AssemblyCopyright>Copyright © EAM Technologies 2024</AssemblyCopyright>
+    <AssemblyVersion>5.0.0.0</AssemblyVersion>
+    <FileVersion>5.0.0.0</FileVersion>
+    <InformationalVersion>5.0.0</InformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.4.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="coverlet.collector" Version="6.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Moq" Version="4.20.69" />
+    <PackageReference Include="FluentAssertions" Version="6.12.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Testing" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Testing" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Extensions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Testing" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Testing" Version="8.0.0" />
+    <PackageReference Include="System.IO.Abstractions" Version="19.2.87" />
+    <PackageReference Include="System.IO.Abstractions.TestingHelpers" Version="19.2.87" />
+    <PackageReference Include="WireMock.Net" Version="1.5.43" />
+    <PackageReference Include="TestContainers" Version="3.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EAM.Agent\EAM.Agent.csproj" />
+    <ProjectReference Include="..\..\src\EAM.Shared\EAM.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="TestData\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="TestData\Installers\" />
+    <Folder Include="TestData\Certificates\" />
+    <Folder Include="TestData\Configurations\" />
+    <Folder Include="TestData\Backups\" />
+    <Folder Include="TestData\Downloads\" />
+  </ItemGroup>
+
+</Project>

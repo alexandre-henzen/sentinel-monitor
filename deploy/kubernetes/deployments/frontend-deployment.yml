@@ -1,0 +1,212 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eam-frontend
+  namespace: eam-system
+  labels:
+    app: eam-frontend
+    component: frontend
+    tier: frontend
+    version: "5.0.0"
+    app.kubernetes.io/name: eam-frontend
+    app.kubernetes.io/version: "5.0.0"
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: employee-activity-monitor
+    app.kubernetes.io/managed-by: kubernetes
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: eam-frontend
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: eam-frontend
+        component: frontend
+        tier: frontend
+        version: "5.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/nginx_status"
+        prometheus.io/port: "80"
+    spec:
+      serviceAccountName: eam-frontend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+      containers:
+        - name: eam-frontend
+          image: ghcr.io/company/eam-frontend:5.0.0
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: NGINX_WORKER_PROCESSES
+              value: "auto"
+            - name: NGINX_WORKER_CONNECTIONS
+              value: "1024"
+            - name: API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: eam-config
+                  key: api-url
+            - name: AUTH_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: eam-config
+                  key: auth-issuer
+            - name: AUTH_CLIENT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: eam-config
+                  key: auth-client-id
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+            successThreshold: 1
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+            successThreshold: 1
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            - name: nginx-default-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: nginx-logs
+              mountPath: /var/log/nginx
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: eam-nginx-config
+        - name: nginx-default-config
+          configMap:
+            name: eam-nginx-default-config
+        - name: nginx-cache
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: nginx-run
+          emptyDir:
+            sizeLimit: 10Mi
+        - name: nginx-logs
+          emptyDir:
+            sizeLimit: 50Mi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - eam-frontend
+                topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                      - arm64
+      tolerations:
+        - key: "eam-workload"
+          operator: "Equal"
+          value: "frontend"
+          effect: "NoSchedule"
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eam-frontend-sa
+  namespace: eam-system
+  labels:
+    app: eam-frontend
+    component: frontend
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eam-frontend-role
+  namespace: eam-system
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eam-frontend-rolebinding
+  namespace: eam-system
+subjects:
+  - kind: ServiceAccount
+    name: eam-frontend-sa
+    namespace: eam-system
+roleRef:
+  kind: Role
+  name: eam-frontend-role
+  apiGroup: rbac.authorization.k8s.io

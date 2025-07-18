@@ -1,0 +1,226 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eam-api
+  namespace: eam-system
+  labels:
+    app: eam-api
+    component: api
+    tier: backend
+    version: "5.0.0"
+    app.kubernetes.io/name: eam-api
+    app.kubernetes.io/version: "5.0.0"
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: employee-activity-monitor
+    app.kubernetes.io/managed-by: kubernetes
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: eam-api
+      component: api
+  template:
+    metadata:
+      labels:
+        app: eam-api
+        component: api
+        tier: backend
+        version: "5.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: eam-api-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: eam-api
+          image: ghcr.io/company/eam-api:5.0.0
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+            - name: DOTNET_RUNNING_IN_CONTAINER
+              value: "true"
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: eam-secrets
+                  key: database-connection-string
+            - name: ConnectionStrings__Redis
+              valueFrom:
+                secretKeyRef:
+                  name: eam-secrets
+                  key: redis-connection-string
+            - name: Jwt__SecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: eam-secrets
+                  key: jwt-secret-key
+            - name: Storage__MinIO__AccessKey
+              valueFrom:
+                secretKeyRef:
+                  name: eam-secrets
+                  key: minio-access-key
+            - name: Storage__MinIO__SecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: eam-secrets
+                  key: minio-secret-key
+            - name: Storage__MinIO__Endpoint
+              valueFrom:
+                configMapKeyRef:
+                  name: eam-config
+                  key: minio-endpoint
+            - name: Storage__MinIO__BucketName
+              valueFrom:
+                configMapKeyRef:
+                  name: eam-config
+                  key: minio-bucket-name
+            - name: Telemetry__OtlpEndpoint
+              valueFrom:
+                configMapKeyRef:
+                  name: eam-config
+                  key: otlp-endpoint
+          resources:
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+            successThreshold: 1
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+            successThreshold: 1
+          volumeMounts:
+            - name: app-config
+              mountPath: /app/appsettings.Production.json
+              subPath: appsettings.Production.json
+              readOnly: true
+            - name: temp-storage
+              mountPath: /app/temp
+            - name: logs
+              mountPath: /app/logs
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: app-config
+          configMap:
+            name: eam-api-config
+        - name: temp-storage
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: logs
+          emptyDir:
+            sizeLimit: 500Mi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - eam-api
+                topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                      - arm64
+      tolerations:
+        - key: "eam-workload"
+          operator: "Equal"
+          value: "api"
+          effect: "NoSchedule"
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eam-api-sa
+  namespace: eam-system
+  labels:
+    app: eam-api
+    component: api
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eam-api-role
+  namespace: eam-system
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eam-api-rolebinding
+  namespace: eam-system
+subjects:
+  - kind: ServiceAccount
+    name: eam-api-sa
+    namespace: eam-system
+roleRef:
+  kind: Role
+  name: eam-api-role
+  apiGroup: rbac.authorization.k8s.io

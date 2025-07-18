@@ -1,0 +1,53 @@
+{
+  "version": "10",
+  "credential": {
+    "accessKey": "minioadmin",
+    "secretKey": "minioadmin"
+  },
+  "region": "us-east-1",
+  "browser": "on",
+  "domain": "",
+  "storageclass": {
+    "standard": "",
+    "rrs": ""
+  },
+  "cache": {
+    "drives": [],
+    "expiry": 90,
+    "quota": 80
+  },
+  "kms": {
+    "vault": {
+      "endpoint": "",
+      "auth": {
+        "type": "",
+        "approle": {
+          "id": "",
+          "secret": ""
+        }
+      },
+      "key-id": {
+        "name": "",
+        "version": 0
+      }
+    }
+  },
+  "notify": {
+    "webhook": {
+      "1": {
+        "enable": false,
+        "endpoint": ""
+      }
+    }
+  },
+  "scanner": {
+    "speed": "default",
+    "exclude": [],
+    "delay": "10s"
+  },
+  "heal": {
+    "bitrotscan": "off",
+    "max-sleep": "1s",
+    "max-io": 10
+  }
+}

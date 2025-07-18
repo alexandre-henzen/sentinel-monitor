@@ -1,0 +1,132 @@
+[
+  {
+    "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    "machineName": "DEV-WORKSTATION-01",
+    "username": "john.doe",
+    "version": "5.0.0",
+    "status": "Online",
+    "lastHeartbeat": "2025-01-15T10:45:00.000Z",
+    "installationDate": "2025-01-10T08:00:00.000Z",
+    "operatingSystem": "Windows 11 Pro",
+    "architecture": "x64",
+    "ipAddress": "192.168.1.100",
+    "configuration": {
+      "screenshotInterval": 300,
+      "updateInterval": 30,
+      "offlineMode": true,
+      "telemetryEnabled": true,
+      "pluginsEnabled": true
+    },
+    "performance": {
+      "cpuUsage": 1.2,
+      "memoryUsage": 85,
+      "uptime": 43200,
+      "eventsProcessed": 15420
+    },
+    "testData": true
+  },
+  {
+    "id": "b2c3d4e5-f6g7-8901-2345-678901bcdef0",
+    "machineName": "DEV-WORKSTATION-02",
+    "username": "jane.smith",
+    "version": "5.0.0",
+    "status": "Online",
+    "lastHeartbeat": "2025-01-15T10:44:30.000Z",
+    "installationDate": "2025-01-12T09:30:00.000Z",
+    "operatingSystem": "Windows 11 Enterprise",
+    "architecture": "x64",
+    "ipAddress": "192.168.1.101",
+    "configuration": {
+      "screenshotInterval": 600,
+      "updateInterval": 60,
+      "offlineMode": true,
+      "telemetryEnabled": true,
+      "pluginsEnabled": false
+    },
+    "performance": {
+      "cpuUsage": 0.8,
+      "memoryUsage": 92,
+      "uptime": 28800,
+      "eventsProcessed": 8760
+    },
+    "testData": true
+  },
+  {
+    "id": "c3d4e5f6-g7h8-9012-3456-789012cdef01",
+    "machineName": "QA-MACHINE-01",
+    "username": "qa.tester",
+    "version": "5.0.0",
+    "status": "Offline",
+    "lastHeartbeat": "2025-01-15T09:30:00.000Z",
+    "installationDate": "2025-01-14T14:00:00.000Z",
+    "operatingSystem": "Windows 10 Pro",
+    "architecture": "x64",
+    "ipAddress": "192.168.1.102",
+    "configuration": {
+      "screenshotInterval": 300,
+      "updateInterval": 30,
+      "offlineMode": true,
+      "telemetryEnabled": false,
+      "pluginsEnabled": true
+    },
+    "performance": {
+      "cpuUsage": 0.0,
+      "memoryUsage": 0,
+      "uptime": 0,
+      "eventsProcessed": 2340
+    },
+    "testData": true
+  },
+  {
+    "id": "d4e5f6g7-h8i9-0123-4567-890123def012",
+    "machineName": "PERF-TEST-01",
+    "username": "performance.test",
+    "version": "5.0.0",
+    "status": "Online",
+    "lastHeartbeat": "2025-01-15T10:45:15.000Z",
+    "installationDate": "2025-01-15T08:00:00.000Z",
+    "operatingSystem": "Windows Server 2022",
+    "architecture": "x64",
+    "ipAddress": "192.168.1.103",
+    "configuration": {
+      "screenshotInterval": 120,
+      "updateInterval": 15,
+      "offlineMode": false,
+      "telemetryEnabled": true,
+      "pluginsEnabled": true
+    },
+    "performance": {
+      "cpuUsage": 1.9,
+      "memoryUsage": 95,
+      "uptime": 14400,
+      "eventsProcessed": 45678
+    },
+    "testData": true
+  },
+  {
+    "id": "e5f6g7h8-i9j0-1234-5678-901234ef0123",
+    "machineName": "INTEGRATION-TEST",
+    "username": "integration.test",
+    "version": "5.0.0",
+    "status": "Online",
+    "lastHeartbeat": "2025-01-15T10:45:30.000Z",
+    "installationDate": "2025-01-15T10:00:00.000Z",
+    "operatingSystem": "Windows 11 Pro",
+    "architecture": "x64",
+    "ipAddress": "192.168.1.104",
+    "configuration": {
+      "screenshotInterval": 180,
+      "updateInterval": 20,
+      "offlineMode": true,
+      "telemetryEnabled": true,
+      "pluginsEnabled": true
+    },
+    "performance": {
+      "cpuUsage": 1.5,
+      "memoryUsage": 78,
+      "uptime": 2700,
+      "eventsProcessed": 1234
+    },
+    "testData": true
+  }
+]

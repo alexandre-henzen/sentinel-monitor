@@ -1,0 +1,10 @@
+modes:
+  - slug: orchestrator          # nome que aparecerá na UI
+    base: ask                   # herda permissões do Ask (ou code / architect)
+    file: .roo/orchestrator.md
+  - slug: architect
+    base: architect
+    file: .roo/architect.md
+  - slug: dev_agent
+    base: code
+    file: .roo/dev_agent.md

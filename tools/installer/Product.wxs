@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util"
+     xmlns:fire="http://wixtoolset.org/schemas/v4/wxs/firewall">
+
+  <!-- Product Definition -->
+  <Product Id="*"
+           Name="$(var.ProductName)"
+           Language="1033"
+           Version="$(var.ProductVersion)"
+           Manufacturer="$(var.ProductManufacturer)"
+           UpgradeCode="$(var.ProductUpgradeCode)">
+
+    <!-- Package Information -->
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perMachine"
+             Platform="x64"
+             Description="$(var.ProductName) - Employee Activity Monitor"
+             Comments="Installs EAM Agent service for employee activity monitoring"
+             Keywords="EAM;Agent;Monitor;Employee;Activity"
+             Manufacturer="$(var.ProductManufacturer)"
+             Languages="1033" />
+
+    <!-- Media and Cab Information -->
+    <Media Id="1" Cabinet="EAMAgent.cab" EmbedCab="yes" />
+
+    <!-- Major Upgrade Logic -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."
+                  Schedule="afterInstallInitialize"
+                  AllowSameVersionUpgrades="yes" />
+
+    <!-- Launch Conditions -->
+    <Launch Condition="Installed OR (VersionNT64 >= 601)"
+            Message="This application requires Windows 7 x64 or higher." />
+
+    <Launch Condition="Installed OR Privileged"
+            Message="Administrator privileges are required to install this application." />
+
+    <!-- Properties -->
+    <Property Id="ARPPRODUCTICON" Value="EAMIcon.ico" />
+    <Property Id="ARPHELPLINK" Value="https://docs.eam.local" />
+    <Property Id="ARPURLINFOABOUT" Value="https://www.eam.local" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPCOMMENTS" Value="EAM Agent for employee activity monitoring" />
+    <Property Id="ARPCONTACT" Value="support@eam.local" />
+    <Property Id="ARPREADME" Value="https://docs.eam.local/readme" />
+    <Property Id="ARPSIZE" Value="52428800" />
+    <Property Id="REINSTALLMODE" Value="amus" />
+    <Property Id="REINSTALL" Value="ALL" />
+    <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
+    <Property Id="MSIFASTINSTALL" Value="3" />
+    <Property Id="ALLUSERS" Value="1" />
+    <Property Id="DISABLEADVTSHORTCUTS" Value="1" />
+
+    <!-- Service Configuration Properties -->
+    <Property Id="SERVICE_NAME" Value="$(var.ServiceName)" />
+    <Property Id="SERVICE_DISPLAY_NAME" Value="$(var.ServiceDisplayName)" />
+    <Property Id="SERVICE_DESCRIPTION" Value="$(var.ServiceDescription)" />
+    <Property Id="SERVICE_AUTO_START" Value="1" />
+    <Property Id="SERVICE_DELAYED_START" Value="1" />
+    <Property Id="SERVICE_RESTART_ON_FAILURE" Value="1" />
+    <Property Id="SERVICE_RECOVERY_RESET_PERIOD" Value="86400" />
+    <Property Id="SERVICE_RECOVERY_RESTART_DELAY" Value="60000" />
+
+    <!-- Installation Directory Properties -->
+    <Property Id="APPLICATIONFOLDER" Value="[$(var.ProgramFilesFolder)]$(var.InstallDir)" />
+    <Property Id="APPLICATIONDATAFOLDER" Value="[LocalAppDataFolder]EAM" />
+    <Property Id="LOGSFOLDER" Value="[APPLICATIONDATAFOLDER]Logs" />
+    <Property Id="BACKUPSFOLDER" Value="[APPLICATIONDATAFOLDER]Backups" />
+    <Property Id="CONFIGFOLDER" Value="[APPLICATIONDATAFOLDER]Config" />
+    <Property Id="PLUGINSFOLDER" Value="[CommonAppDataFolder]EAM\plugins" />
+    <Property Id="TEMPFOLDER" Value="[TempFolder]EAM" />
+    <Property Id="CACHEFOLDER" Value="[APPLICATIONDATAFOLDER]Cache" />
+
+    <!-- Feature Configuration Properties -->
+    <Property Id="INSTALL_SERVICE" Value="1" />
+    <Property Id="INSTALL_FIREWALL_EXCEPTION" Value="1" />
+    <Property Id="INSTALL_START_MENU_SHORTCUT" Value="1" />
+    <Property Id="INSTALL_DESKTOP_SHORTCUT" Value="0" />
+    <Property Id="INSTALL_AUTO_START" Value="1" />
+    <Property Id="INSTALL_PERFORMANCE_COUNTERS" Value="1" />
+    <Property Id="INSTALL_EVENT_LOG_SOURCE" Value="1" />
+    <Property Id="INSTALL_CERTIFICATES" Value="1" />
+    <Property Id="INSTALL_TELEMETRY" Value="1" />
+    <Property Id="INSTALL_UPDATES" Value="1" />
+
+    <!-- Directory Structure -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <!-- Program Files -->
+      <Directory Id="$(var.ProgramFilesFolder)">
+        <Directory Id="APPLICATIONFOLDER" Name="$(var.InstallDir)">
+          <Directory Id="BINDIR" Name="bin" />
+          <Directory Id="CONFIGDIR" Name="config" />
+          <Directory Id="LOGSDIR" Name="logs" />
+          <Directory Id="RUNTIMEDIR" Name="runtime" />
+          <Directory Id="PLUGINSDIR" Name="plugins" />
+        </Directory>
+      </Directory>
+
+      <!-- AppData Directories -->
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="APPLICATIONDATAFOLDER" Name="EAM">
+          <Directory Id="LOGSFOLDER" Name="Logs" />
+          <Directory Id="BACKUPSFOLDER" Name="Backups" />
+          <Directory Id="CONFIGFOLDER" Name="Config" />
+          <Directory Id="CACHEFOLDER" Name="Cache" />
+        </Directory>
+      </Directory>
+
+      <!-- Common AppData -->
+      <Directory Id="CommonAppDataFolder">
+        <Directory Id="COMMONAPPDATA_EAM" Name="EAM">
+          <Directory Id="PLUGINSFOLDER" Name="plugins" />
+        </Directory>
+      </Directory>
+
+      <!-- Start Menu -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="APPLICATIONSTARTMENUFOLDER" Name="EAM Agent" />
+      </Directory>
+
+      <!-- Desktop -->
+      <Directory Id="DesktopFolder" />
+
+      <!-- System Directories -->
+      <Directory Id="System64Folder" />
+      <Directory Id="WindowsFolder" />
+      <Directory Id="TempFolder">
+        <Directory Id="TEMPFOLDER" Name="EAM" />
+      </Directory>
+    </Directory>
+
+    <!-- Components -->
+    <!-- Main Application Component -->
+    <DirectoryRef Id="APPLICATIONFOLDER">
+      <Component Id="MainApplication" Guid="$(var.ComponentGuid)" Win64="yes">
+        <File Id="EAMAgentExe" 
+              Source="$(var.BinPath)\EAM.Agent.exe" 
+              KeyPath="yes"
+              Name="EAM.Agent.exe"
+              ProcessorArchitecture="x64"
+              Checksum="yes"
+              Vital="yes" />
+
+        <File Id="EAMAgentDll" 
+              Source="$(var.BinPath)\EAM.Agent.dll" 
+              Name="EAM.Agent.dll"
+              ProcessorArchitecture="x64"
+              Checksum="yes"
+              Vital="yes" />
+
+        <File Id="EAMSharedDll" 
+              Source="$(var.BinPath)\EAM.Shared.dll" 
+              Name="EAM.Shared.dll"
+              ProcessorArchitecture="x64"
+              Checksum="yes"
+              Vital="yes" />
+
+        <File Id="AppSettingsJson" 
+              Source="$(var.BinPath)\appsettings.json" 
+              Name="appsettings.json"
+              Checksum="yes"
+              Vital="yes" />
+
+        <!-- Runtime Dependencies -->
+        <File Id="RuntimeConfigJson" 
+              Source="$(var.BinPath)\EAM.Agent.runtimeconfig.json" 
+              Name="EAM.Agent.runtimeconfig.json"
+              Checksum="yes"
+              Vital="yes" />
+
+        <File Id="DepsJson" 
+              Source="$(var.BinPath)\EAM.Agent.deps.json" 
+              Name="EAM.Agent.deps.json"
+              Checksum="yes"
+              Vital="yes" />
+
+        <!-- Create Application Data Directories -->
+        <CreateFolder Directory="APPLICATIONDATAFOLDER" />
+        <CreateFolder Directory="LOGSFOLDER" />
+        <CreateFolder Directory="BACKUPSFOLDER" />
+        <CreateFolder Directory="CONFIGFOLDER" />
+        <CreateFolder Directory="CACHEFOLDER" />
+        <CreateFolder Directory="PLUGINSFOLDER" />
+        <CreateFolder Directory="TEMPFOLDER" />
+
+        <!-- Registry Entries -->
+        <RegistryKey Root="HKLM" Key="SOFTWARE\EAM\Agent">
+          <RegistryValue Name="InstallPath" Value="[APPLICATIONFOLDER]" Type="string" />
+          <RegistryValue Name="Version" Value="$(var.ProductVersion)" Type="string" />
+          <RegistryValue Name="InstallDate" Value="[Date]" Type="string" />
+          <RegistryValue Name="DataPath" Value="[APPLICATIONDATAFOLDER]" Type="string" />
+          <RegistryValue Name="ConfigPath" Value="[CONFIGFOLDER]" Type="string" />
+          <RegistryValue Name="LogsPath" Value="[LOGSFOLDER]" Type="string" />
+          <RegistryValue Name="PluginsPath" Value="[PLUGINSFOLDER]" Type="string" />
+          <RegistryValue Name="AutoUpdate" Value="1" Type="integer" />
+          <RegistryValue Name="TelemetryEnabled" Value="1" Type="integer" />
+          <RegistryValue Name="ServiceName" Value="$(var.ServiceName)" Type="string" />
+        </RegistryKey>
+
+        <!-- Uninstall Registry -->
+        <RegistryKey Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]">
+          <RegistryValue Name="DisplayName" Value="$(var.ProductName)" Type="string" />
+          <RegistryValue Name="DisplayVersion" Value="$(var.ProductVersion)" Type="string" />
+          <RegistryValue Name="Publisher" Value="$(var.ProductManufacturer)" Type="string" />
+          <RegistryValue Name="InstallLocation" Value="[APPLICATIONFOLDER]" Type="string" />
+          <RegistryValue Name="UninstallString" Value="msiexec /x [ProductCode]" Type="string" />
+          <RegistryValue Name="QuietUninstallString" Value="msiexec /x [ProductCode] /quiet" Type="string" />
+          <RegistryValue Name="NoModify" Value="1" Type="integer" />
+          <RegistryValue Name="NoRepair" Value="1" Type="integer" />
+          <RegistryValue Name="EstimatedSize" Value="51200" Type="integer" />
+          <RegistryValue Name="HelpLink" Value="https://docs.eam.local" Type="string" />
+          <RegistryValue Name="URLInfoAbout" Value="https://www.eam.local" Type="string" />
+          <RegistryValue Name="Contact" Value="support@eam.local" Type="string" />
+        </RegistryKey>
+
+        <!-- Environment Variables -->
+        <Environment Id="EAM_INSTALL_PATH" Name="EAM_INSTALL_PATH" Value="[APPLICATIONFOLDER]" System="yes" Action="set" />
+        <Environment Id="EAM_DATA_PATH" Name="EAM_DATA_PATH" Value="[APPLICATIONDATAFOLDER]" System="yes" Action="set" />
+        <Environment Id="EAM_VERSION" Name="EAM_VERSION" Value="$(var.ProductVersion)" System="yes" Action="set" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Windows Service Component -->
+    <DirectoryRef Id="APPLICATIONFOLDER">
+      <Component Id="WindowsService" Guid="$(var.ServiceGuid)" Win64="yes">
+        <Condition>INSTALL_SERVICE</Condition>
+        
+        <ServiceInstall Id="EAMAgentService"
+                        Name="$(var.ServiceName)"
+                        DisplayName="$(var.ServiceDisplayName)"
+                        Description="$(var.ServiceDescription)"
+                        Type="ownProcess"
+                        Start="auto"
+                        ErrorControl="normal"
+                        Interactive="no"
+                        LoadOrderGroup="NetworkProvider"
+                        Arguments="--service"
+                        Account="LocalSystem"
+                        Password=""
+                        Vital="yes">
+          <ServiceDependency Id="Tcpip" />
+          <ServiceDependency Id="Dnscache" />
+          <ServiceDependency Id="Eventlog" />
+          <ServiceConfig DelayedAutoStart="yes" 
+                         OnInstall="yes" 
+                         OnReinstall="yes" 
+                         OnUninstall="yes" />
+        </ServiceInstall>
+
+        <ServiceControl Id="StartEAMAgentService"
+                        Name="$(var.ServiceName)"
+                        Start="install"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="yes" />
+
+        <!-- Service Recovery Configuration -->
+        <util:ServiceConfig ServiceName="$(var.ServiceName)"
+                           FirstFailureActionType="restart"
+                           SecondFailureActionType="restart"
+                           ThirdFailureActionType="restart"
+                           RestartServiceDelayInSeconds="60"
+                           ResetPeriodInDays="1" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Firewall Exception Component -->
+    <DirectoryRef Id="APPLICATIONFOLDER">
+      <Component Id="FirewallException" Guid="$(var.FirewallGuid)" Win64="yes">
+        <Condition>INSTALL_FIREWALL_EXCEPTION</Condition>
+        
+        <fire:FirewallException Id="EAMAgentFirewallException"
+                               Name="EAM Agent"
+                               Description="Allow EAM Agent to communicate with the API server"
+                               Program="[APPLICATIONFOLDER]EAM.Agent.exe"
+                               Scope="any"
+                               Profile="all"
+                               Protocol="tcp"
+                               Direction="out" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Start Menu Component -->
+    <DirectoryRef Id="APPLICATIONSTARTMENUFOLDER">
+      <Component Id="StartMenuShortcuts" Guid="$(var.StartMenuGuid)" Win64="yes">
+        <Condition>INSTALL_START_MENU_SHORTCUT</Condition>
+        
+        <Shortcut Id="EAMAgentStartMenuShortcut"
+                  Name="EAM Agent Configuration"
+                  Description="Configure EAM Agent settings"
+                  Target="[APPLICATIONFOLDER]EAM.Agent.exe"
+                  Arguments="--config"
+                  WorkingDirectory="APPLICATIONFOLDER"
+                  Icon="EAMIcon.ico"
+                  IconIndex="0"
+                  Advertise="no" />
+
+        <Shortcut Id="EAMAgentLogsShortcut"
+                  Name="EAM Agent Logs"
+                  Description="View EAM Agent logs"
+                  Target="[LOGSFOLDER]"
+                  WorkingDirectory="LOGSFOLDER"
+                  Advertise="no" />
+
+        <Shortcut Id="EAMAgentUninstallShortcut"
+                  Name="Uninstall EAM Agent"
+                  Description="Uninstall EAM Agent"
+                  Target="[System64Folder]msiexec.exe"
+                  Arguments="/x [ProductCode]"
+                  Advertise="no" />
+
+        <RemoveFolder Id="RemoveApplicationStartMenuFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="SOFTWARE\EAM\Agent" Name="StartMenuInstalled" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Desktop Shortcut Component -->
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="$(var.DesktopGuid)" Win64="yes">
+        <Condition>INSTALL_DESKTOP_SHORTCUT</Condition>
+        
+        <Shortcut Id="EAMAgentDesktopShortcut"
+                  Name="EAM Agent"
+                  Description="EAM Agent Configuration"
+                  Target="[APPLICATIONFOLDER]EAM.Agent.exe"
+                  Arguments="--config"
+                  WorkingDirectory="APPLICATIONFOLDER"
+                  Icon="EAMIcon.ico"
+                  IconIndex="0"
+                  Advertise="no" />
+
+        <RegistryValue Root="HKCU" Key="SOFTWARE\EAM\Agent" Name="DesktopShortcutInstalled" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Event Log Component -->
+    <DirectoryRef Id="APPLICATIONFOLDER">
+      <Component Id="EventLogSource" Guid="$(var.EventLogGuid)" Win64="yes">
+        <Condition>INSTALL_EVENT_LOG_SOURCE</Condition>
+        
+        <util:EventSource Log="Application" 
+                         Name="EAM Agent" 
+                         EventMessageFile="[APPLICATIONFOLDER]EAM.Agent.exe"
+                         CategoryMessageFile="[APPLICATIONFOLDER]EAM.Agent.exe"
+                         SupportsErrors="yes"
+                         SupportsWarnings="yes"
+                         SupportsInformationals="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Performance Counters Component -->
+    <DirectoryRef Id="APPLICATIONFOLDER">
+      <Component Id="PerformanceCounters" Guid="$(var.PerformanceGuid)" Win64="yes">
+        <Condition>INSTALL_PERFORMANCE_COUNTERS</Condition>
+        
+        <util:PerformanceCategory Id="EAMAgentPerformanceCategory"
+                                 Name="EAM Agent"
+                                 Help="EAM Agent Performance Counters"
+                                 MultiInstance="no">
+          <util:PerformanceCounter Name="Events Captured"
+                                  Help="Number of events captured"
+                                  Type="numberOfItems32" />
+          <util:PerformanceCounter Name="Events Per Second"
+                                  Help="Number of events captured per second"
+                                  Type="rateOfCountsPerSecond32" />
+          <util:PerformanceCounter Name="API Sync Errors"
+                                  Help="Number of API synchronization errors"
+                                  Type="numberOfItems32" />
+          <util:PerformanceCounter Name="Memory Usage"
+                                  Help="Memory usage in bytes"
+                                  Type="numberOfItems64" />
+          <util:PerformanceCounter Name="Update Check Count"
+                                  Help="Number of update checks performed"
+                                  Type="numberOfItems32" />
+          <util:PerformanceCounter Name="Uptime"
+                                  Help="Service uptime in seconds"
+                                  Type="numberOfItems64" />
+        </util:PerformanceCategory>
+      </Component>
+    </DirectoryRef>
+
+    <!-- Icon -->
+    <Icon Id="EAMIcon.ico" SourceFile="eam-icon.ico" />
+
+    <!-- Custom Actions -->
+    <CustomAction Id="SetInstallFolder" Property="APPLICATIONFOLDER" Value="[$(var.ProgramFilesFolder)]$(var.InstallDir)" />
+    <CustomAction Id="SetDataFolder" Property="APPLICATIONDATAFOLDER" Value="[LocalAppDataFolder]EAM" />
+    <CustomAction Id="CheckDotNetFramework" BinaryKey="CustomActionsBinary" DllEntry="CheckDotNetFramework" Execute="immediate" />
+    <CustomAction Id="ValidateSystemRequirements" BinaryKey="CustomActionsBinary" DllEntry="ValidateSystemRequirements" Execute="immediate" />
+    <CustomAction Id="ConfigureService" BinaryKey="CustomActionsBinary" DllEntry="ConfigureService" Execute="deferred" Impersonate="no" />
+    <CustomAction Id="RegisterTelemetry" BinaryKey="CustomActionsBinary" DllEntry="RegisterTelemetry" Execute="deferred" Impersonate="no" />
+    <CustomAction Id="InitializeDatabase" BinaryKey="CustomActionsBinary" DllEntry="InitializeDatabase" Execute="deferred" Impersonate="no" />
+    <CustomAction Id="RegisterUpdateScheduler" BinaryKey="CustomActionsBinary" DllEntry="RegisterUpdateScheduler" Execute="deferred" Impersonate="no" />
+    <CustomAction Id="CleanupOnUninstall" BinaryKey="CustomActionsBinary" DllEntry="CleanupOnUninstall" Execute="deferred" Impersonate="no" />
+
+    <!-- Binary for Custom Actions -->
+    <Binary Id="CustomActionsBinary" SourceFile="CustomActions.CA.dll" />
+
+    <!-- Install Sequence -->
+    <InstallExecuteSequence>
+      <Custom Action="SetInstallFolder" Before="CostFinalize">NOT Installed</Custom>
+      <Custom Action="SetDataFolder" Before="CostFinalize">NOT Installed</Custom>
+      <Custom Action="CheckDotNetFramework" Before="LaunchConditions">NOT Installed</Custom>
+      <Custom Action="ValidateSystemRequirements" Before="LaunchConditions">NOT Installed</Custom>
+      <Custom Action="ConfigureService" After="InstallServices">NOT Installed AND INSTALL_SERVICE</Custom>
+      <Custom Action="RegisterTelemetry" After="InstallFinalize">NOT Installed AND INSTALL_TELEMETRY</Custom>
+      <Custom Action="InitializeDatabase" After="InstallFinalize">NOT Installed</Custom>
+      <Custom Action="RegisterUpdateScheduler" After="InstallFinalize">NOT Installed AND INSTALL_UPDATES</Custom>
+      <Custom Action="CleanupOnUninstall" Before="RemoveFiles">REMOVE="ALL"</Custom>
+    </InstallExecuteSequence>
+
+    <!-- UI Sequence -->
+    <InstallUISequence>
+      <Custom Action="SetInstallFolder" Before="CostFinalize">NOT Installed</Custom>
+      <Custom Action="SetDataFolder" Before="CostFinalize">NOT Installed</Custom>
+      <Custom Action="CheckDotNetFramework" Before="LaunchConditions">NOT Installed</Custom>
+      <Custom Action="ValidateSystemRequirements" Before="LaunchConditions">NOT Installed</Custom>
+    </InstallUISequence>
+
+    <!-- UI Reference -->
+    <UIRef Id="WixUI_FeatureTree" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+
+    <!-- License Agreement -->
+    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+    <WixVariable Id="WixUIBannerBmp" Value="banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="dialog.bmp" />
+  </Product>
+</Wix>

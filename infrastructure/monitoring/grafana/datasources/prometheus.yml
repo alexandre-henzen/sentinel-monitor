@@ -1,0 +1,59 @@
+# Prometheus datasource configuration for Grafana
+# EAM v5.0 monitoring
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: 15s
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+      prometheusVersion: 2.40.0
+      cacheLevel: 'High'
+      disableMetricsLookup: false
+      customQueryParameters: ""
+      httpHeaderName1: "Authorization"
+    secureJsonData:
+      httpHeaderValue1: "Bearer prometheus-token"
+
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: true
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: 'prometheus'
+        tags: ['job', 'instance', 'pod', 'namespace']
+        mappedTags: [
+          { key: 'service.name', value: 'job' }
+        ]
+        mapTagNamesEnabled: true
+        spanStartTimeShift: '1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: true
+        filterBySpanID: true
+      tracesToMetrics:
+        datasourceUid: 'prometheus'
+        tags: [
+          { key: 'service.name', value: 'job' },
+          { key: 'job' }
+        ]
+        queries: [
+          {
+            name: 'Sample query',
+            query: 'sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m]))'
+          }
+        ]
+      spanBar:
+        type: 'Tag'
+        tag: 'http.path'
+      nodeGraph:
+        enabled: true
