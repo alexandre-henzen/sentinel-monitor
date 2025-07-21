@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyTitle>EAM API</AssemblyTitle>
+    <AssemblyDescription>Employee Activity Monitor API - RESTful Web API</AssemblyDescription>
+    <AssemblyCompany>EAM Corporation</AssemblyCompany>
+    <AssemblyProduct>Employee Activity Monitor</AssemblyProduct>
+    <AssemblyCopyright>Copyright © EAM Corporation 2025</AssemblyCopyright>
+    <AssemblyVersion>5.0.0.0</AssemblyVersion>
+    <FileVersion>5.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.8" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.8" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.8" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.8" />
+    <PackageReference Include="AutoMapper" Version="12.0.1" />
+    <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
+    <PackageReference Include="FluentValidation" Version="11.9.2" />
+    <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI" Version="7.0.2" />
+    <PackageReference Include="AspNetCore.HealthChecks.Npgsql" Version="7.2.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="8.0.1" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.0.0-beta.12" />
+    <PackageReference Include="OpenTelemetry.Exporter.Jaeger" Version="1.5.1" />
+    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.9.0-beta.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Cors" Version="2.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EAM.API.Core\EAM.API.Core.csproj" />
+    <ProjectReference Include="..\..\EAM.Shared\EAM.Shared.csproj" />
+    <ProjectReference Include="..\..\Shared\EAM.Shared.Contracts\EAM.Shared.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\EAM.Shared.Security\EAM.Shared.Security.csproj" />
+    <ProjectReference Include="..\..\Shared\EAM.Shared.Telemetry\EAM.Shared.Telemetry.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\EAM.Infrastructure.Data\EAM.Infrastructure.Data.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\EAM.Infrastructure.Messaging\EAM.Infrastructure.Messaging.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\EAM.Infrastructure.Storage\EAM.Infrastructure.Storage.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\EAM.Infrastructure.Cache\EAM.Infrastructure.Cache.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\EAM.Infrastructure.Processing\EAM.Infrastructure.Processing.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\EAM.Infrastructure.Analytics\EAM.Infrastructure.Analytics.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\EAM.Infrastructure.Security\EAM.Infrastructure.Security.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\EAM.Infrastructure.HealthCheck\EAM.Infrastructure.HealthCheck.csproj" />
+  </ItemGroup>
+
+</Project>

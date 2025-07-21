@@ -1,0 +1,126 @@
+version: '3.8'
+
+# Development override for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # EAM API Development overrides
+  eam-api:
+    build:
+      target: base
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - Features__EnableSwagger=true
+      - Features__EnableDetailedErrors=true
+      - Features__EnableSensitiveDataLogging=true
+      - Database__EnableSensitiveDataLogging=true
+      - Database__EnableDetailedErrors=true
+      - Logging__LogLevel__Default=Debug
+      - Logging__LogLevel__Microsoft.AspNetCore=Information
+    volumes:
+      - ./src/API/EAM.API:/app/src
+      - ./logs/api:/app/logs
+    command: ["dotnet", "watch", "run", "--project", "/app/src/EAM.API.csproj"]
+
+  # EAM Web Development overrides
+  eam-web:
+    build:
+      target: base
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - Logging__LogLevel__Default=Debug
+      - Logging__LogLevel__Microsoft.AspNetCore=Information
+    volumes:
+      - ./src/Web/EAM.Web:/app/src
+      - ./logs/web:/app/logs
+    command: ["dotnet", "watch", "run", "--project", "/app/src/EAM.Web.csproj"]
+
+  # EAM Agent Development overrides
+  eam-agent:
+    build:
+      target: base
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - AgentSettings__DataSyncInterval=10
+      - AgentSettings__ScreenshotInterval=60
+      - AgentSettings__EnableWebTracking=true
+      - AgentSettings__EnableTeamsTracking=false
+      - AgentSettings__EnableScreenshots=false
+      - Logging__LogLevel__Default=Debug
+    volumes:
+      - ./src/Agent/EAM.Agent:/app/src
+      - ./logs/agent:/app/logs
+      - ./data/agent:/app/Data
+    command: ["dotnet", "watch", "run", "--project", "/app/src/EAM.Agent.csproj"]
+
+  # PostgreSQL Development overrides
+  postgres:
+    environment:
+      - POSTGRES_DB=EAM_DB_Dev
+      - POSTGRES_USER=eam_dev_user
+      - POSTGRES_PASSWORD=eam_dev_password
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+      - ./scripts/postgres-dev-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./logs/postgres:/var/log/postgresql
+
+  # Redis Development overrides
+  redis:
+    volumes:
+      - redis-dev-data:/data
+      - ./logs/redis:/var/log/redis
+
+  # MinIO Development overrides
+  minio:
+    environment:
+      - MINIO_ROOT_USER=eam_dev_minio
+      - MINIO_ROOT_PASSWORD=eam_dev_minio_password
+    volumes:
+      - minio-dev-data:/data
+      - ./logs/minio:/var/log/minio
+
+  # Development Tools
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: eam-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@eam.local
+      - PGADMIN_DEFAULT_PASSWORD=eam_pgadmin_password
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - eam-network
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: eam-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - eam-network
+
+  # Mailhog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: eam-mailhog
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - eam-network
+
+volumes:
+  postgres-dev-data:
+  redis-dev-data:
+  minio-dev-data:
+  pgadmin-data:

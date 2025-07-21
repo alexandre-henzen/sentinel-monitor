@@ -1,0 +1,325 @@
+name: EAM - CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  NODE_VERSION: '18.x'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: eam
+
+jobs:
+  # Job 1: Build and Test .NET Projects
+  build-and-test-dotnet:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Cache .NET packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+          
+    - name: Restore dependencies
+      run: dotnet restore EAM.sln
+      
+    - name: Build solution
+      run: dotnet build EAM.sln --configuration Release --no-restore
+      
+    - name: Run unit tests
+      run: dotnet test EAM.sln --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
+      
+    - name: Generate test report
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: .NET Test Results
+        path: '**/*.trx'
+        reporter: dotnet-trx
+        
+    - name: Upload code coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        
+    - name: Build artifacts
+      run: |
+        dotnet publish src/API/EAM.API/EAM.API.csproj -c Release -o ./publish/api
+        dotnet publish src/Web/EAM.Web/EAM.Web.csproj -c Release -o ./publish/web
+        dotnet publish src/Agent/EAM.Agent/EAM.Agent.csproj -c Release -o ./publish/agent
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dotnet-artifacts
+        path: ./publish/
+        retention-days: 30
+
+  # Job 2: Build and Test Angular
+  build-and-test-angular:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: src/Web/EAM.Web/ClientApp/package-lock.json
+        
+    - name: Install dependencies
+      run: |
+        cd src/Web/EAM.Web/ClientApp
+        npm ci
+        
+    - name: Lint Angular code
+      run: |
+        cd src/Web/EAM.Web/ClientApp
+        npm run lint
+        
+    - name: Run Angular tests
+      run: |
+        cd src/Web/EAM.Web/ClientApp
+        npm run test:ci
+        
+    - name: Build Angular app
+      run: |
+        cd src/Web/EAM.Web/ClientApp
+        npm run build:prod
+        
+    - name: Upload Angular build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: angular-artifacts
+        path: src/Web/EAM.Web/ClientApp/dist/
+        retention-days: 30
+
+  # Job 3: Security Scan
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: [build-and-test-dotnet]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+        
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        languages: 'csharp,javascript'
+
+  # Job 4: Build Docker Images
+  build-docker-images:
+    runs-on: ubuntu-latest
+    needs: [build-and-test-dotnet, build-and-test-angular]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    
+    strategy:
+      matrix:
+        service: [api, web, agent]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Login to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/eam-${{ matrix.service }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix=sha-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./src/${{ matrix.service == 'api' && 'API/EAM.API' || matrix.service == 'web' && 'Web/EAM.Web' || 'Agent/EAM.Agent' }}/Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Run Docker image scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ github.repository }}/eam-${{ matrix.service }}:latest
+        format: 'sarif'
+        output: 'trivy-image-results.sarif'
+        
+    - name: Upload Docker image scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-image-results.sarif'
+
+  # Job 5: Integration Tests
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: [build-docker-images]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: EAM_DB_Test
+          POSTGRES_USER: eam_test_user
+          POSTGRES_PASSWORD: eam_test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+          
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Run integration tests
+      run: dotnet test tests/EAM.Integration.Tests/EAM.Integration.Tests.csproj --configuration Release --verbosity normal
+      env:
+        ConnectionStrings__DefaultConnection: "Host=localhost;Database=EAM_DB_Test;Username=eam_test_user;Password=eam_test_password"
+        ConnectionStrings__RedisConnection: "localhost:6379"
+
+  # Job 6: Deploy to Development
+  deploy-development:
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: github.ref == 'refs/heads/develop'
+    environment: development
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to Development Environment
+      run: |
+        echo "Deploying to development environment..."
+        # Add your deployment commands here
+        # Example: kubectl, helm, or docker-compose commands
+        
+    - name: Run smoke tests
+      run: |
+        echo "Running smoke tests..."
+        # Add smoke test commands here
+
+  # Job 7: Deploy to Production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to Production Environment
+      run: |
+        echo "Deploying to production environment..."
+        # Add your deployment commands here
+        # Example: kubectl, helm, or docker-compose commands
+        
+    - name: Run smoke tests
+      run: |
+        echo "Running smoke tests..."
+        # Add smoke test commands here
+        
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: EAM v${{ github.ref }}
+        body: |
+          Employee Activity Monitor v${{ github.ref }}
+          
+          ## Changes
+          - Auto-generated release from CI/CD pipeline
+          
+        draft: false
+        prerelease: false
+
+  # Job 8: Notification
+  notification:
+    runs-on: ubuntu-latest
+    needs: [deploy-development, deploy-production]
+    if: always()
+    
+    steps:
+    - name: Notify Teams
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#eam-deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+      if: env.SLACK_WEBHOOK_URL != null

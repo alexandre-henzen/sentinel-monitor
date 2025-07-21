@@ -1,0 +1,20 @@
+{
+  "orchestrator": {
+    "name": "EM Orchestrator",
+    "prompt": ".roo/orchestrator.md",
+    "description": "Analisa tarefas complexas, cria um plano e delega a execução para agentes especializados. Não escreve código.",
+    "model": "claude-opus-4-20250514"
+  },
+  "architect": {
+    "name": "EM Software Architect",
+    "prompt": ".roo/architect.md",
+    "description": "Projeta a arquitetura de software, estrutura de diretórios e modelos de dados. Cria a documentação de design.",
+    "model": "claude-sonnet-4-20250514"
+  },
+  "dev_agent": {
+    "name": "EM Dev Agent (Coder)",
+    "prompt": ".roo/dev_agent.md",
+    "description": "Escreve código de alta qualidade com base em especificações técnicas. Focado na implementação.",
+    "model": "claude-sonnet-4-20250514"
+  }
+ }

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyTitle>EAM Infrastructure Storage</AssemblyTitle>
+    <AssemblyDescription>Employee Activity Monitor - Storage Infrastructure</AssemblyDescription>
+    <AssemblyCompany>EAM Corporation</AssemblyCompany>
+    <AssemblyProduct>Employee Activity Monitor</AssemblyProduct>
+    <AssemblyCopyright>Copyright © EAM Corporation 2025</AssemblyCopyright>
+    <AssemblyVersion>5.0.0.0</AssemblyVersion>
+    <FileVersion>5.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Minio" Version="6.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="8.0.8" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\API\EAM.API.Core\EAM.API.Core.csproj" />
+    <ProjectReference Include="..\..\EAM.Shared\EAM.Shared.csproj" />
+    <ProjectReference Include="..\..\Shared\EAM.Shared.Contracts\EAM.Shared.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

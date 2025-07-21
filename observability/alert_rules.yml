@@ -1,0 +1,160 @@
+groups:
+  - name: eam-agent-alerts
+    rules:
+      # Agent CPU Usage Alert
+      - alert: EAM_Agent_High_CPU
+        expr: eam_agent_cpu_usage_percent > 2
+        for: 2m
+        labels:
+          severity: warning
+          service: eam-agent
+        annotations:
+          summary: "EAM Agent CPU usage is high"
+          description: "Agent CPU usage is {{ $value }}% which is above the 2% threshold"
+
+      # Agent Memory Usage Alert
+      - alert: EAM_Agent_High_Memory
+        expr: eam_agent_memory_usage_bytes > 500000000  # 500MB
+        for: 2m
+        labels:
+          severity: warning
+          service: eam-agent
+        annotations:
+          summary: "EAM Agent memory usage is high"
+          description: "Agent memory usage is {{ $value | humanize }}B which is above 500MB threshold"
+
+      # Events Lost Alert
+      - alert: EAM_Agent_Events_Lost
+        expr: rate(eam_agent_events_lost_total[5m]) > 0.001  # 0.1% loss rate
+        for: 1m
+        labels:
+          severity: critical
+          service: eam-agent
+        annotations:
+          summary: "EAM Agent is losing events"
+          description: "Agent is losing events at a rate of {{ $value | humanizePercentage }} which is above 0.1% threshold"
+
+      # Sync Latency Alert
+      - alert: EAM_Agent_High_Sync_Latency
+        expr: histogram_quantile(0.95, rate(eam_agent_sync_latency_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: eam-agent
+        annotations:
+          summary: "EAM Agent sync latency is high"
+          description: "95th percentile sync latency is {{ $value }}s which is above 5s threshold"
+
+      # Agent Down Alert
+      - alert: EAM_Agent_Down
+        expr: up{job="eam-agent"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: eam-agent
+        annotations:
+          summary: "EAM Agent is down"
+          description: "EAM Agent has been down for more than 1 minute"
+
+  - name: eam-api-alerts
+    rules:
+      # API High Response Time
+      - alert: EAM_API_High_Response_Time
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="EAM.API"}[5m])) > 0.2
+        for: 2m
+        labels:
+          severity: warning
+          service: eam-api
+        annotations:
+          summary: "EAM API response time is high"
+          description: "95th percentile response time is {{ $value }}s which is above 200ms threshold"
+
+      # API High Error Rate
+      - alert: EAM_API_High_Error_Rate
+        expr: rate(http_requests_total{service="EAM.API",code!~"2.."}[5m]) / rate(http_requests_total{service="EAM.API"}[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          service: eam-api
+        annotations:
+          summary: "EAM API error rate is high"
+          description: "API error rate is {{ $value | humanizePercentage }} which is above 1% threshold"
+
+      # API Low Request Rate (might indicate issues)
+      - alert: EAM_API_Low_Request_Rate
+        expr: rate(http_requests_total{service="EAM.API"}[5m]) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: eam-api
+        annotations:
+          summary: "EAM API request rate is unusually low"
+          description: "API request rate is {{ $value }} req/s which might indicate connectivity issues"
+
+      # API Down Alert
+      - alert: EAM_API_Down
+        expr: up{job="eam-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: eam-api
+        annotations:
+          summary: "EAM API is down"
+          description: "EAM API has been down for more than 1 minute"
+
+  - name: eam-system-alerts
+    rules:
+      # System Availability Alert
+      - alert: EAM_System_Low_Availability
+        expr: (up{job="eam-api"} + up{job="eam-agent"}) / 2 < 0.995
+        for: 5m
+        labels:
+          severity: critical
+          service: eam-system
+        annotations:
+          summary: "EAM System availability is below 99.5%"
+          description: "System availability is {{ $value | humanizePercentage }} which is below 99.5% threshold"
+
+      # Database Connection Issues
+      - alert: EAM_Database_Connection_Issues
+        expr: rate(eam_api_db_connection_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: eam-api
+        annotations:
+          summary: "EAM API database connection issues"
+          description: "Database connection errors detected at {{ $value }} errors/s"
+
+      # High CPU Usage (System)
+      - alert: EAM_System_High_CPU
+        expr: (100 - (avg(irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: eam-system
+        annotations:
+          summary: "System CPU usage is high"
+          description: "System CPU usage is {{ $value }}% which is above 80% threshold"
+
+      # High Memory Usage (System)
+      - alert: EAM_System_High_Memory
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: eam-system
+        annotations:
+          summary: "System memory usage is high"
+          description: "System memory usage is {{ $value }}% which is above 85% threshold"
+
+      # Disk Space Alert
+      - alert: EAM_System_Low_Disk_Space
+        expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          service: eam-system
+        annotations:
+          summary: "System disk space is low"
+          description: "Disk usage is {{ $value }}% which is above 90% threshold"

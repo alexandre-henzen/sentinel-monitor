@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyTitle>EAM Infrastructure Health Check</AssemblyTitle>
+    <AssemblyDescription>Employee Activity Monitor Infrastructure - Health Check Services</AssemblyDescription>
+    <AssemblyCompany>EAM Corporation</AssemblyCompany>
+    <AssemblyProduct>Employee Activity Monitor</AssemblyProduct>
+    <AssemblyCopyright>Copyright © EAM Corporation 2025</AssemblyCopyright>
+    <AssemblyVersion>5.0.0.0</AssemblyVersion>
+    <FileVersion>5.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="8.0.8" />
+    <PackageReference Include="AspNetCore.HealthChecks.Npgsql" Version="7.2.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="8.0.1" />
+    <PackageReference Include="Npgsql" Version="8.0.3" />
+    <PackageReference Include="StackExchange.Redis" Version="2.7.33" />
+    <PackageReference Include="Minio" Version="6.0.3" />
+    <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\API\EAM.API.Core\EAM.API.Core.csproj" />
+    <ProjectReference Include="..\..\Shared\EAM.Shared\EAM.Shared.csproj" />
+  </ItemGroup>
+
+</Project>
