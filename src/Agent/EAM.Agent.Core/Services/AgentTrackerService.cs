@@ -170,6 +170,20 @@ public class AgentTrackerService : BackgroundService
                 Console.WriteLine("⚠️  BrowserTracker desabilitado na configuração");
             }
 
+            // TeamsTracker - IMPORTANTE para ambiente corporativo brasileiro
+            if (_configuration.TeamsTracker.Enabled)
+            {
+                var teamsTracker = _trackersScope.ServiceProvider.GetRequiredService<TeamsTracker>();
+                teamsTracker.EventCaptured += OnEventCaptured;
+                _trackers.Add(teamsTracker);
+                Console.WriteLine($"✅ TeamsTracker criado: {teamsTracker.Name} (com suporte português)");
+                _logger.LogInformation("TeamsTracker criado (suporte português): {TrackerName}", teamsTracker.Name);
+            }
+            else
+            {
+                Console.WriteLine("⚠️  TeamsTracker desabilitado na configuração");
+            }
+
             // ScreenshotCapturer - mantém apenas se habilitado (sem event handler para evitar conflitos)
             if (_configuration.ScreenshotCapturer.Enabled)
             {

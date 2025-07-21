@@ -340,9 +340,9 @@ public class TeamsTracker : ITracker, IDisposable
 
     private async Task<ActivityEvent> CreateActivityEvent(TeamsEventInfo eventInfo, string windowTitle)
     {
-        var currentTime = DateTime.UtcNow;
-        var duration = _lastCaptureTime != DateTime.MinValue ? 
-                      currentTime - _lastCaptureTime : 
+        var currentTime = DateTime.Now; // Timezone local
+        var duration = _lastCaptureTime != DateTime.MinValue ?
+                      currentTime - _lastCaptureTime :
                       TimeSpan.Zero;
 
         var activityEvent = new ActivityEvent
@@ -351,8 +351,8 @@ public class TeamsTracker : ITracker, IDisposable
             AgentId = _agentId,
             UserId = _userId,
             Timestamp = currentTime,
-            Type = eventInfo.EventType == TeamsEventType.MeetingEnd ? 
-                   ActivityType.TeamsCallEnd : 
+            Type = eventInfo.EventType == TeamsEventType.MeetingEnd ?
+                   ActivityType.TeamsCallEnd :
                    ActivityType.TeamsCall,
             Application = "Microsoft Teams",
             WindowTitle = windowTitle,
@@ -382,7 +382,7 @@ public class TeamsTracker : ITracker, IDisposable
 
     private async Task<TeamsEvent> CreateTeamsEvent(Guid activityEventId, TeamsEventInfo eventInfo, string windowTitle)
     {
-        var currentTime = DateTime.UtcNow;
+        var currentTime = DateTime.Now; // Timezone local
         
         // Calcula duração da reunião
         var durationSeconds = 0;
