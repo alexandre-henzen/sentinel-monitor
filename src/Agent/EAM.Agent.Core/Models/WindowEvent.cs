@@ -21,6 +21,7 @@ public class WindowEvent
     /// <summary>
     /// Handle da janela (HWND)
     /// </summary>
+    [NotMapped]
     public IntPtr WindowHandle { get; set; }
 
     /// <summary>

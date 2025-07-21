@@ -9,6 +9,8 @@ using OpenTelemetry.Trace;
 using Serilog;
 using System.Diagnostics.Metrics;
 using System.Reflection;
+using EAM.Agent.Core.Extensions;
+using EAM.Agent.Core.Data;
 
 namespace EAM.Agent;
 
@@ -20,6 +22,25 @@ public class Program
 
         var logger = host.Services.GetRequiredService<ILogger<Program>>();
         logger.LogInformation("Iniciando EAM Agent v{Version}", GetVersion());
+
+        // Configurar SQLite para resolver problema WAL e melhorar performance
+        try
+        {
+            using var scope = host.Services.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AgentDbContext>();
+            
+            // Garantir que o banco existe
+            await dbContext.Database.EnsureCreatedAsync();
+            
+            // Configurar parâmetros SQLite
+            dbContext.ConfigureSqlite();
+            
+            logger.LogInformation("SQLite configurado com sucesso (WAL auto-checkpoint ativado)");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Falha ao configurar SQLite");
+        }
 
         try
         {
@@ -48,8 +69,8 @@ public class Program
             })
             .ConfigureServices((context, services) =>
             {
-                // Core Services - Para ser implementado
-                services.AddHostedService<AgentBackgroundService>();
+                // Adicionar serviços do EAM Agent Core (inclui SQLite, trackers, etc.)
+                services.AddEamAgentCore(context.Configuration);
 
                 // HTTP Client
                 services.AddHttpClient("EAM.API", client =>
@@ -57,9 +78,6 @@ public class Program
                     client.BaseAddress = new Uri(context.Configuration["ApiSettings:BaseUrl"] ?? "https://localhost:7001");
                     client.DefaultRequestHeaders.Add("User-Agent", $"EAM-Agent/{GetVersion()}");
                 });
-
-                // Configuration - Para ser implementado
-                // services.Configure<AgentSettings>(context.Configuration.GetSection("AgentSettings"));
                 
                 // Configure OpenTelemetry
                 var telemetrySettings = context.Configuration.GetSection("Telemetry");

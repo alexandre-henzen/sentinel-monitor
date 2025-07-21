@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using EAM.Agent.Core.Models;
 using EAM.Agent.Core.Data;
 using System.Diagnostics;
@@ -16,12 +17,12 @@ public class AgentTrackerService : BackgroundService
 {
     private readonly ILogger<AgentTrackerService> _logger;
     private readonly IServiceProvider _serviceProvider;
-    private readonly IActivityEventRepository _repository;
     private readonly AgentConfiguration _configuration;
     private readonly List<ITracker> _trackers = new();
-    private readonly ScoringEngine _scoringEngine;
     private readonly System.Threading.Timer _syncTimer;
     private readonly System.Threading.Timer _cleanupTimer;
+    private readonly System.Threading.Timer _checkpointTimer; // Timer para checkpoint manual
+    private IServiceScope? _trackersScope; // Scope permanente para os trackers
 
     private bool _isInitialized = false;
     private readonly object _lockObject = new object();
@@ -29,29 +30,32 @@ public class AgentTrackerService : BackgroundService
     public AgentTrackerService(
         ILogger<AgentTrackerService> logger,
         IServiceProvider serviceProvider,
-        IActivityEventRepository repository,
         IOptions<AgentConfiguration> configuration)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
-        _repository = repository;
         _configuration = configuration.Value;
-        
-        _scoringEngine = serviceProvider.GetRequiredService<ScoringEngine>();
         
         // Timer para sincronização de dados (60 segundos)
         _syncTimer = new System.Threading.Timer(
-            SyncDataAsync, 
-            null, 
-            TimeSpan.FromSeconds(60), 
+            SyncDataAsync,
+            null,
+            TimeSpan.FromSeconds(60),
             TimeSpan.FromSeconds(60));
         
         // Timer para limpeza de dados antigos (1 hora)
         _cleanupTimer = new System.Threading.Timer(
-            CleanupOldDataAsync, 
-            null, 
-            TimeSpan.FromHours(1), 
+            CleanupOldDataAsync,
+            null,
+            TimeSpan.FromHours(1),
             TimeSpan.FromHours(1));
+        
+        // Timer para checkpoint manual WAL (30 segundos)
+        _checkpointTimer = new System.Threading.Timer(
+            CheckpointWalAsync,
+            null,
+            30000, // 30 segundos em millisegundos
+            30000);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -139,55 +143,44 @@ public class AgentTrackerService : BackgroundService
     {
         try
         {
-            // WindowTracker - intervalo de 1 segundo
-            if (_configuration.WindowTracker.Enabled)
-            {
-                var windowTracker = _serviceProvider.GetRequiredService<WindowTracker>();
-                windowTracker.EventCaptured += OnEventCaptured;
-                _trackers.Add(windowTracker);
-                _logger.LogDebug("WindowTracker criado");
-            }
+            Console.WriteLine("=== INICIANDO CRIAÇÃO DOS TRACKERS ===");
+            _logger.LogInformation("=== INICIANDO CRIAÇÃO DOS TRACKERS ===");
+            
+            // CORREÇÃO: Criar scope permanente para os trackers (resolve problema DI)
+            _trackersScope = _serviceProvider.CreateScope();
+            Console.WriteLine("✅ Scope permanente criado para trackers");
 
-            // BrowserTracker - intervalo de 2 segundos
-            if (_configuration.BrowserTracker.Enabled)
-            {
-                var browserTracker = _serviceProvider.GetRequiredService<BrowserTracker>();
-                browserTracker.EventCaptured += OnEventCaptured;
-                _trackers.Add(browserTracker);
-                _logger.LogDebug("BrowserTracker criado");
-            }
+            // SessionTracker - NOVO: Focado em tempo de uso de aplicações relevantes
+            var sessionTracker = _trackersScope.ServiceProvider.GetRequiredService<SessionTracker>();
+            _trackers.Add(sessionTracker);
+            Console.WriteLine($"✅ SessionTracker criado: {sessionTracker.Name}");
+            _logger.LogInformation("SessionTracker criado (foco em tempo de uso): {TrackerName}", sessionTracker.Name);
 
-            // TeamsTracker - intervalo de 5 segundos
-            if (_configuration.TeamsTracker.Enabled)
-            {
-                var teamsTracker = _serviceProvider.GetRequiredService<TeamsTracker>();
-                teamsTracker.EventCaptured += OnEventCaptured;
-                _trackers.Add(teamsTracker);
-                _logger.LogDebug("TeamsTracker criado");
-            }
+            // DESABILITADO: Trackers antigos que coletam dados desnecessários
+            Console.WriteLine("⚠️  Trackers antigos desabilitados para focar em SessionTracker");
 
-            // ScreenshotCapturer - intervalo de 60 segundos (configurável)
+            // ScreenshotCapturer - mantém apenas se habilitado (sem event handler para evitar conflitos)
             if (_configuration.ScreenshotCapturer.Enabled)
             {
-                var screenshotCapturer = _serviceProvider.GetRequiredService<ScreenshotCapturer>();
-                screenshotCapturer.EventCaptured += OnEventCaptured;
+                var screenshotCapturer = _trackersScope.ServiceProvider.GetRequiredService<ScreenshotCapturer>();
+                // REMOVIDO: screenshotCapturer.EventCaptured += OnEventCaptured; // Causa conflitos de ID
                 _trackers.Add(screenshotCapturer);
-                _logger.LogDebug("ScreenshotCapturer criado");
+                Console.WriteLine($"✅ ScreenshotCapturer criado: {screenshotCapturer.Name} (sem event handler)");
+                _logger.LogInformation("ScreenshotCapturer criado (sem event handler): {TrackerName}", screenshotCapturer.Name);
             }
-
-            // ProcessMonitor - intervalo de 5 segundos
-            if (_configuration.ProcessMonitor.Enabled)
+            else
             {
-                var processMonitor = _serviceProvider.GetRequiredService<ProcessMonitor>();
-                processMonitor.EventCaptured += OnEventCaptured;
-                _trackers.Add(processMonitor);
-                _logger.LogDebug("ProcessMonitor criado");
+                Console.WriteLine("⚠️  ScreenshotCapturer desabilitado na configuração");
             }
 
+            Console.WriteLine($"✅ Total de trackers criados: {_trackers.Count}");
+            _logger.LogInformation("Total de trackers criados: {TrackerCount}", _trackers.Count);
+            
             await Task.CompletedTask;
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"❌ ERRO ao criar trackers: {ex.Message}");
             _logger.LogError(ex, "Erro ao criar trackers");
             throw;
         }
@@ -209,11 +202,14 @@ public class AgentTrackerService : BackgroundService
     {
         try
         {
+            Console.WriteLine($"🚀 INICIANDO TRACKER: {tracker.Name}");
             await tracker.StartAsync(cancellationToken);
-            _logger.LogInformation("{TrackerName} iniciado", tracker.Name);
+            Console.WriteLine($"✅ TRACKER INICIADO COM SUCESSO: {tracker.Name} (IsEnabled: {tracker.IsEnabled})");
+            _logger.LogInformation("{TrackerName} iniciado (IsEnabled: {IsEnabled})", tracker.Name, tracker.IsEnabled);
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"❌ ERRO ao iniciar {tracker.Name}: {ex.Message}");
             _logger.LogError(ex, "Erro ao iniciar {TrackerName}", tracker.Name);
         }
     }
@@ -272,10 +268,17 @@ public class AgentTrackerService : BackgroundService
     {
         try
         {
-            // Aplica pontuação de produtividade
-            await _scoringEngine.ScoreActivityEventAsync(activityEvent);
+            using var scope = _serviceProvider.CreateScope();
+            var scoringEngine = scope.ServiceProvider.GetRequiredService<ScoringEngine>();
+            var repository = scope.ServiceProvider.GetRequiredService<IActivityEventRepository>();
             
-            _logger.LogDebug("Evento capturado e pontuado: {EventType} - {Application} - Score: {Score}",
+            // Aplica pontuação de produtividade
+            await scoringEngine.ScoreActivityEventAsync(activityEvent);
+            
+            // CORREÇÃO CRÍTICA: Salvar evento no banco de dados
+            await repository.AddActivityEventAsync(activityEvent);
+            
+            _logger.LogDebug("Evento capturado, pontuado e salvo: {EventType} - {Application} - Score: {Score}",
                 activityEvent.Type, activityEvent.Application, activityEvent.ProductivityScore);
         }
         catch (Exception ex)
@@ -288,10 +291,13 @@ public class AgentTrackerService : BackgroundService
     {
         try
         {
+            using var scope = _serviceProvider.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IActivityEventRepository>();
+            
             _logger.LogDebug("Iniciando sincronização de dados...");
             
             // Obtém eventos não sincronizados
-            var unsyncedEvents = await _repository.GetUnsyncedEventsAsync(100);
+            var unsyncedEvents = await repository.GetUnsyncedEventsAsync(100);
             
             if (unsyncedEvents.Any())
             {
@@ -300,7 +306,7 @@ public class AgentTrackerService : BackgroundService
                 // Aqui seria implementada a sincronização com a API
                 // Por enquanto, apenas marca como sincronizado
                 var eventIds = unsyncedEvents.Select(e => e.Id).ToList();
-                await _repository.MarkEventsSyncedAsync(eventIds);
+                await repository.MarkEventsSyncedAsync(eventIds);
                 
                 _logger.LogInformation("Sincronização concluída");
             }
@@ -315,17 +321,40 @@ public class AgentTrackerService : BackgroundService
     {
         try
         {
+            using var scope = _serviceProvider.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IActivityEventRepository>();
+            
             _logger.LogDebug("Iniciando limpeza de dados antigos...");
             
             // Remove eventos sincronizados com mais de 7 dias
             var cutoffDate = DateTime.UtcNow.AddDays(-_configuration.RetentionDays);
-            await _repository.CleanupOldEventsAsync(cutoffDate);
+            await repository.CleanupOldEventsAsync(cutoffDate);
             
             _logger.LogInformation("Limpeza de dados antigos concluída");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro durante limpeza de dados antigos");
+        }
+    }
+
+    private async void CheckpointWalAsync(object? state)
+    {
+        try
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AgentDbContext>();
+            
+            _logger.LogDebug("Executando checkpoint manual do WAL...");
+            
+            // Força checkpoint do WAL
+            dbContext.Database.ExecuteSqlRaw("PRAGMA wal_checkpoint(PASSIVE)");
+            
+            _logger.LogDebug("Checkpoint manual do WAL concluído");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Erro durante checkpoint manual do WAL");
         }
     }
 
@@ -336,6 +365,7 @@ public class AgentTrackerService : BackgroundService
         // Para os timers
         _syncTimer?.Change(Timeout.Infinite, 0);
         _cleanupTimer?.Change(Timeout.Infinite, 0);
+        _checkpointTimer?.Change(Timeout.Infinite, 0);
         
         // Para o serviço base
         await base.StopAsync(cancellationToken);
@@ -347,6 +377,7 @@ public class AgentTrackerService : BackgroundService
     {
         _syncTimer?.Dispose();
         _cleanupTimer?.Dispose();
+        _checkpointTimer?.Dispose();
         
         // Dispose dos trackers
         foreach (var tracker in _trackers)
@@ -357,7 +388,8 @@ public class AgentTrackerService : BackgroundService
             }
         }
         
-        _scoringEngine?.Dispose();
+        // Dispose do scope permanente dos trackers
+        _trackersScope?.Dispose();
         
         base.Dispose();
     }

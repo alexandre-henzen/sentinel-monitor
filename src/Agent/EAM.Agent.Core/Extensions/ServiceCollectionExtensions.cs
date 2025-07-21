@@ -42,15 +42,16 @@ public static class ServiceCollectionExtensions
         services.Configure<ScoringConfiguration>(configuration.GetSection("Scoring"));
         services.Configure<TelemetryConfiguration>(configuration.GetSection("Telemetry"));
 
-        // Trackers
-        services.AddSingleton<WindowTracker>();
-        services.AddSingleton<BrowserTracker>();
-        services.AddSingleton<TeamsTracker>();
-        services.AddSingleton<ScreenshotCapturer>();
-        services.AddSingleton<ProcessMonitor>();
+        // Trackers - usar Scoped ao invés de Singleton para resolver dependência do repository
+        services.AddTransient<WindowTracker>();
+        services.AddTransient<BrowserTracker>();
+        services.AddTransient<TeamsTracker>();
+        services.AddTransient<ScreenshotCapturer>();
+        services.AddTransient<ProcessMonitor>();
+        services.AddTransient<SessionTracker>(); // Novo tracker focado em sessões de uso
 
         // Scoring Engine
-        services.AddSingleton<ScoringEngine>();
+        services.AddTransient<ScoringEngine>();
 
         // Serviço principal
         services.AddHostedService<AgentTrackerService>();
