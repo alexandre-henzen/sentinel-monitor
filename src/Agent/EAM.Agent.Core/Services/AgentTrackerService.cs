@@ -156,8 +156,19 @@ public class AgentTrackerService : BackgroundService
             Console.WriteLine($"✅ SessionTracker criado: {sessionTracker.Name}");
             _logger.LogInformation("SessionTracker criado (foco em tempo de uso): {TrackerName}", sessionTracker.Name);
 
-            // DESABILITADO: Trackers antigos que coletam dados desnecessários
-            Console.WriteLine("⚠️  Trackers antigos desabilitados para focar em SessionTracker");
+            // BrowserTracker - REATIVADO: Necessário para capturar abas do browser
+            if (_configuration.BrowserTracker.Enabled)
+            {
+                var browserTracker = _trackersScope.ServiceProvider.GetRequiredService<BrowserTracker>();
+                browserTracker.EventCaptured += OnEventCaptured;
+                _trackers.Add(browserTracker);
+                Console.WriteLine($"✅ BrowserTracker criado: {browserTracker.Name} (para capturar abas)");
+                _logger.LogInformation("BrowserTracker criado (para abas): {TrackerName}", browserTracker.Name);
+            }
+            else
+            {
+                Console.WriteLine("⚠️  BrowserTracker desabilitado na configuração");
+            }
 
             // ScreenshotCapturer - mantém apenas se habilitado (sem event handler para evitar conflitos)
             if (_configuration.ScreenshotCapturer.Enabled)

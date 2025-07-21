@@ -137,39 +137,101 @@ public class SessionTracker : ITracker, IDisposable
         {
             Console.WriteLine("🔍 CheckActiveApplication() executado");
             
+            // ESTRATÉGIA 1: Tentar GetForegroundWindow (pode não funcionar em terminal/RDP)
             var foregroundWindow = WindowsApi.GetForegroundWindow();
-            if (foregroundWindow == IntPtr.Zero)
+            if (foregroundWindow != IntPtr.Zero)
+            {
+                var processId = WindowsApi.GetWindowThreadProcessId(foregroundWindow, out _);
+                if (processId != 0)
+                {
+                    Console.WriteLine($"📱 ProcessId via ForegroundWindow: {processId}");
+                    
+                    if (TryProcessApplication(processId, foregroundWindow))
+                    {
+                        return; // Sucesso com ForegroundWindow
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("❌ ProcessId = 0 via ForegroundWindow");
+                }
+            }
+            else
             {
                 Console.WriteLine("❌ Nenhuma janela em foreground");
-                return;
             }
 
-            // Obtém informações da aplicação ativa
-            var processId = WindowsApi.GetWindowThreadProcessId(foregroundWindow, out _);
-            if (processId == 0)
+            // ESTRATÉGIA 2: Buscar processos relevantes rodando (fallback)
+            Console.WriteLine("🔄 Tentando detectar processos relevantes...");
+            
+            var relevantProcesses = FindRelevantRunningProcesses();
+            if (relevantProcesses.Any())
             {
-                Console.WriteLine("❌ ProcessId = 0");
-                return;
+                // ESTRATÉGIA: Dar preferência a browsers, depois outros apps
+                var browserProcesses = relevantProcesses.Where(p =>
+                    p.ProcessName.ToLowerInvariant().Contains("edge") ||
+                    p.ProcessName.ToLowerInvariant().Contains("chrome") ||
+                    p.ProcessName.ToLowerInvariant().Contains("firefox")).ToList();
+                
+                Process selectedProcess;
+                if (browserProcesses.Any())
+                {
+                    // Prefere browser mais recente
+                    selectedProcess = browserProcesses.OrderByDescending(p => p.StartTime).First();
+                    Console.WriteLine($"📱 Processo BROWSER selecionado: {selectedProcess.ProcessName} (PID: {selectedProcess.Id})");
+                }
+                else
+                {
+                    // Se não há browsers, pega o mais recente
+                    selectedProcess = relevantProcesses.OrderByDescending(p => p.StartTime).First();
+                    Console.WriteLine($"📱 Processo relevante encontrado: {selectedProcess.ProcessName} (PID: {selectedProcess.Id})");
+                }
+                
+                if (TryProcessApplication((uint)selectedProcess.Id, IntPtr.Zero, selectedProcess))
+                {
+                    return; // Sucesso com processo relevante
+                }
+            }
+            else
+            {
+                Console.WriteLine("⚠️ Nenhum processo relevante encontrado rodando");
             }
 
-            Console.WriteLine($"📱 ProcessId detectado: {processId}");
+            // Se chegou aqui, não encontrou nada relevante
+            if (_currentSession != null)
+            {
+                Console.WriteLine("🔄 Finalizando sessão ativa (nenhuma app relevante detectada)");
+                EndCurrentSession();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ ERRO em CheckActiveApplication: {ex.Message}");
+            _logger.LogDebug(ex, "Erro ao verificar aplicação ativa");
+        }
+    }
 
-            // Protege contra processos que podem ter terminado
-            Process? process = null;
-            try
+    private bool TryProcessApplication(uint processId, IntPtr windowHandle, Process? existingProcess = null)
+    {
+        Process? process = existingProcess;
+        try
+        {
+            if (process == null)
             {
-                process = Process.GetProcessById((int)processId);
-            }
-            catch (ArgumentException)
-            {
-                Console.WriteLine($"❌ Processo {processId} não existe mais");
-                return;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ Erro ao obter processo {processId}: {ex.Message}");
-                _logger.LogDebug(ex, "Erro ao obter processo {ProcessId}", processId);
-                return;
+                try
+                {
+                    process = Process.GetProcessById((int)processId);
+                }
+                catch (ArgumentException)
+                {
+                    Console.WriteLine($"❌ Processo {processId} não existe mais");
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Erro ao obter processo {processId}: {ex.Message}");
+                    return false;
+                }
             }
 
             using (process)
@@ -183,13 +245,22 @@ public class SessionTracker : ITracker, IDisposable
                 catch (Exception)
                 {
                     Console.WriteLine("❌ Não conseguiu obter nome do processo");
-                    return;
+                    return false;
                 }
 
-                var titleBuffer = new StringBuilder(256);
-                var windowTitleLength = WindowsApi.GetWindowText(foregroundWindow, titleBuffer, 256);
-                var windowTitle = titleBuffer.ToString();
-                Console.WriteLine($"🪟 Título da janela: {windowTitle}");
+                string windowTitle = "";
+                if (windowHandle != IntPtr.Zero)
+                {
+                    var titleBuffer = new StringBuilder(256);
+                    var windowTitleLength = WindowsApi.GetWindowText(windowHandle, titleBuffer, 256);
+                    windowTitle = titleBuffer.ToString();
+                    Console.WriteLine($"🪟 Título da janela: {windowTitle}");
+                }
+                else
+                {
+                    windowTitle = process.MainWindowTitle ?? "";
+                    Console.WriteLine($"🪟 Título do processo: {windowTitle}");
+                }
 
                 // Verifica se é uma aplicação relevante
                 bool isRelevant = IsRelevantApplication(applicationName, windowTitle);
@@ -198,13 +269,7 @@ public class SessionTracker : ITracker, IDisposable
                 if (!isRelevant)
                 {
                     Console.WriteLine("⏭️ Aplicação não relevante, ignorando...");
-                    // Se estava em uma sessão de app relevante, finaliza
-                    if (_currentSession != null)
-                    {
-                        Console.WriteLine("🔄 Finalizando sessão ativa (app não relevante)");
-                        EndCurrentSession();
-                    }
-                    return;
+                    return false;
                 }
 
                 // Verifica se mudou de aplicação
@@ -233,13 +298,50 @@ public class SessionTracker : ITracker, IDisposable
                 }
 
                 _lastActivity = DateTime.UtcNow;
+                return true;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ ERRO em CheckActiveApplication: {ex.Message}");
-            _logger.LogDebug(ex, "Erro ao verificar aplicação ativa");
+            Console.WriteLine($"❌ ERRO ao processar aplicação: {ex.Message}");
+            return false;
         }
+    }
+
+    private List<Process> FindRelevantRunningProcesses()
+    {
+        var relevantProcesses = new List<Process>();
+        
+        foreach (var appName in _relevantApplications)
+        {
+            try
+            {
+                var processes = Process.GetProcessesByName(appName);
+                foreach (var process in processes)
+                {
+                    try
+                    {
+                        // Filtra apenas processos com janela principal ou que tenham título
+                        if (!string.IsNullOrEmpty(process.MainWindowTitle) || process.MainWindowHandle != IntPtr.Zero)
+                        {
+                            relevantProcesses.Add(process);
+                            Console.WriteLine($"   ✅ Encontrado: {process.ProcessName} (PID: {process.Id}) - '{process.MainWindowTitle}'");
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // Processo pode ter terminado, continua
+                        process?.Dispose();
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Processo não encontrado ou erro de acesso, continua
+            }
+        }
+        
+        return relevantProcesses;
     }
 
     private bool IsRelevantApplication(string applicationName, string windowTitle)

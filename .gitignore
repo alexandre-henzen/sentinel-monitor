@@ -642,3 +642,5 @@ certs/
 *.pem
 *.p12
 *.pfx
+src/Agent/EAM.Agent/EAM.Agent.db-wal
+src/Agent/EAM.Agent/EAM.Agent.db-shm
