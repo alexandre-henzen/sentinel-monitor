@@ -30,7 +30,7 @@ public class SessionTracker : ITracker, IDisposable
     private SessionEvent? _currentSession;
     private string _lastActiveApplication = string.Empty;
     private string _lastActiveWindowTitle = string.Empty;
-    private DateTime _lastActivity = DateTime.UtcNow;
+    private DateTime _lastActivity = DateTime.Now;
 
     // Lista de aplicações relevantes para monitoramento
     private readonly HashSet<string> _relevantApplications = new(StringComparer.OrdinalIgnoreCase)
@@ -297,7 +297,7 @@ public class SessionTracker : ITracker, IDisposable
                     Console.WriteLine("✅ Mantendo sessão atual");
                 }
 
-                _lastActivity = DateTime.UtcNow;
+                _lastActivity = DateTime.Now;
                 return true;
             }
         }
@@ -387,7 +387,7 @@ public class SessionTracker : ITracker, IDisposable
                 SessionType = sessionType,
                 Category = category,
                 ProductivityScore = CalculateProductivityScore(category),
-                StartTime = DateTime.UtcNow,
+                StartTime = DateTime.Now,
                 IsActive = true
             };
 
@@ -426,14 +426,17 @@ public class SessionTracker : ITracker, IDisposable
         {
             if (_currentSession == null) return;
 
-            _currentSession.EndTime = DateTime.UtcNow;
+            _currentSession.EndTime = DateTime.Now;
             _currentSession.IsActive = false;
-            _currentSession.UpdatedAt = DateTime.UtcNow;
+            _currentSession.UpdatedAt = DateTime.Now;
+            
+            // Calcula duração em segundos
+            _currentSession.DurationSeconds = (int)(_currentSession.EndTime.Value - _currentSession.StartTime).TotalSeconds;
 
             _dbContext.SessionEvents.Update(_currentSession);
             _dbContext.SaveChanges();
 
-            _logger.LogInformation("Sessão finalizada: {App} - Duração: {Duration}s", 
+            _logger.LogInformation("Sessão finalizada: {App} - Duração: {Duration}s",
                 _currentSession.ApplicationName, _currentSession.DurationSeconds);
 
             // Dispara evento

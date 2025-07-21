@@ -86,18 +86,10 @@ public class SessionEvent
     public DateTime? EndTime { get; set; }
 
     /// <summary>
-    /// Duração da sessão em segundos
+    /// Duração da sessão em segundos (persistida no banco)
     /// </summary>
-    public int DurationSeconds 
-    { 
-        get 
-        { 
-            if (EndTime.HasValue)
-                return (int)(EndTime.Value - StartTime).TotalSeconds;
-            else
-                return (int)(DateTime.UtcNow - StartTime).TotalSeconds;
-        } 
-    }
+    [Required]
+    public int DurationSeconds { get; set; } = 0;
 
     /// <summary>
     /// Se a sessão ainda está ativa
@@ -112,16 +104,16 @@ public class SessionEvent
     public bool IsSynced { get; set; } = false;
 
     /// <summary>
-    /// Quando foi criado o registro
+    /// Quando foi criado o registro (timezone local)
     /// </summary>
     [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     /// <summary>
-    /// Última atualização
+    /// Última atualização (timezone local)
     /// </summary>
     [Required]
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }
 
 /// <summary>
